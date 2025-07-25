@@ -252,55 +252,55 @@ if [ ! -x "$SCRIPT_DIR/create_structure.sh" ]; then
     chmod +x "$SCRIPT_DIR/create_structure.sh"
 fi
 
-# Create bin directory in user's home if it doesn't exist
-BIN_DIR="$HOME/bin"
+# Create hidden bin directory in user's home if it doesn't exist
+BIN_DIR="$HOME/.bin"
 if [ ! -d "$BIN_DIR" ]; then
-    print_info "Creating ~/bin directory..."
+    print_info "Creating hidden ~/.bin directory..."
     mkdir -p "$BIN_DIR"
-    print_success "Created ~/bin directory"
+    print_success "Created hidden ~/.bin directory"
 else
-    print_info "~/bin directory already exists"
+    print_info "Hidden ~/.bin directory already exists"
 fi
 
-# Check if we can write to ~/bin
+# Check if we can write to ~/.bin
 if [ ! -w "$BIN_DIR" ]; then
-    print_error "Cannot write to ~/bin directory. Please check permissions."
+    print_error "Cannot write to ~/.bin directory. Please check permissions."
     exit 1
 fi
 
 # Check if dp-generator already exists
-TARGET_FILE="$BIN_DIR/dp-generator"
+TARGET_FILE="$BIN_DIR/.dp-generator"
 if [ -f "$TARGET_FILE" ]; then
-    print_warning "dp-generator already exists in ~/bin"
+    print_warning ".dp-generator already exists in ~/.bin"
     print_info "Backing up existing installation..."
     cp "$TARGET_FILE" "$TARGET_FILE.backup.$(date +%Y%m%d_%H%M%S)"
     print_success "Backup created"
 fi
 
-# Copy the script to user's bin directory
-print_info "Copying create_structure.sh to ~/bin/dp-generator..."
+# Copy the script to user's hidden bin directory
+print_info "Copying create_structure.sh to ~/.bin/.dp-generator..."
 if cp "$SCRIPT_DIR/create_structure.sh" "$TARGET_FILE"; then
-    print_success "Successfully copied create_structure.sh to ~/bin/dp-generator"
+    print_success "Successfully copied create_structure.sh to ~/.bin/.dp-generator"
 else
-    print_error "Failed to copy create_structure.sh to ~/bin/dp-generator"
+    print_error "Failed to copy create_structure.sh to ~/.bin/.dp-generator"
     exit 1
 fi
 
-# Create dp-generator directory in ~/bin for supporting files
-DP_GENERATOR_DIR="$BIN_DIR/dp-generator-files"
+# Create hidden dp-generator directory in ~/.bin for supporting files
+DP_GENERATOR_DIR="$BIN_DIR/.dp-generator-files"
 if [ -d "$DP_GENERATOR_DIR" ]; then
-    print_warning "dp-generator-files directory already exists in ~/bin"
+    print_warning ".dp-generator-files directory already exists in ~/.bin"
     print_info "Backing up existing installation..."
     mv "$DP_GENERATOR_DIR" "$DP_GENERATOR_DIR.backup.$(date +%Y%m%d_%H%M%S)"
     print_success "Backup created"
 fi
 
-# Copy the entire directory structure to ~/bin/dp-generator-files
-print_info "Copying dp-generator files to ~/bin/dp-generator-files..."
+# Copy the entire directory structure to ~/.bin/.dp-generator-files
+print_info "Copying dp-generator files to ~/.bin/.dp-generator-files..."
 if cp -r "$SCRIPT_DIR" "$DP_GENERATOR_DIR"; then
-    print_success "Successfully copied dp-generator files to ~/bin/dp-generator-files"
+    print_success "Successfully copied dp-generator files to ~/.bin/.dp-generator-files"
 else
-    print_error "Failed to copy dp-generator files to ~/bin/dp-generator-files"
+    print_error "Failed to copy dp-generator files to ~/.bin/.dp-generator-files"
     exit 1
 fi
 
@@ -314,12 +314,34 @@ else
 fi
 
 # Make it executable
-print_info "Making dp-generator executable..."
+print_info "Making .dp-generator executable..."
 if chmod +x "$TARGET_FILE"; then
-    print_success "Made dp-generator executable"
+    print_success "Made .dp-generator executable"
 else
-    print_error "Failed to make dp-generator executable"
+    print_error "Failed to make .dp-generator executable"
     exit 1
+fi
+
+# Create a symlink for easy access (optional)
+SYMLINK_PATH="$HOME/.local/bin/dp-generator"
+if [ ! -d "$HOME/.local/bin" ]; then
+    mkdir -p "$HOME/.local/bin"
+fi
+
+if [ -L "$SYMLINK_PATH" ]; then
+    print_warning "Symlink already exists, updating..."
+    rm "$SYMLINK_PATH"
+fi
+
+if ln -s "$TARGET_FILE" "$SYMLINK_PATH"; then
+    print_success "Created symlink: $SYMLINK_PATH -> $TARGET_FILE"
+    # Add .local/bin to PATH if not already there
+    if ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$HOME/.zshrc" 2>/dev/null; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+        print_info "Added ~/.local/bin to PATH"
+    fi
+else
+    print_warning "Failed to create symlink, you can still use: ~/.bin/.dp-generator"
 fi
 
 # Test if the script can be executed
@@ -396,16 +418,16 @@ fi
 # Update the detected shell configuration file
 if [[ -n "$SHELL_CONFIG" ]]; then
     if [ -f "$SHELL_CONFIG" ]; then
-        if ! grep -q "export PATH=\"\$HOME/bin:\$PATH\"" "$SHELL_CONFIG"; then
-            print_info "Adding ~/bin to PATH in $SHELL_CONFIG..."
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$SHELL_CONFIG"
+        if ! grep -q "export PATH=\"\$HOME/.bin:\$PATH\"" "$SHELL_CONFIG"; then
+            print_info "Adding ~/.bin to PATH in $SHELL_CONFIG..."
+            echo 'export PATH="$HOME/.bin:$PATH"' >> "$SHELL_CONFIG"
             PATH_UPDATED=true
         else
-            print_info "~/bin already in PATH in $SHELL_CONFIG"
+            print_info "~/.bin already in PATH in $SHELL_CONFIG"
         fi
     else
         print_warning "$SHELL_CONFIG not found, creating it..."
-        echo 'export PATH="$HOME/bin:$PATH"' > "$SHELL_CONFIG"
+        echo 'export PATH="$HOME/.bin:$PATH"' > "$SHELL_CONFIG"
         PATH_UPDATED=true
     fi
 else
@@ -414,31 +436,31 @@ else
     
     # Check and update .bashrc
     if [ -f "$HOME/.bashrc" ]; then
-        if ! grep -q "export PATH=\"\$HOME/bin:\$PATH\"" "$HOME/.bashrc"; then
-            print_info "Adding ~/bin to PATH in .bashrc..."
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
+        if ! grep -q "export PATH=\"\$HOME/.bin:\$PATH\"" "$HOME/.bashrc"; then
+            print_info "Adding ~/.bin to PATH in .bashrc..."
+            echo 'export PATH="$HOME/.bin:$PATH"' >> "$HOME/.bashrc"
             PATH_UPDATED=true
         else
-            print_info "~/bin already in PATH in .bashrc"
+            print_info "~/.bin already in PATH in .bashrc"
         fi
     else
         print_warning ".bashrc not found, creating it..."
-        echo 'export PATH="$HOME/bin:$PATH"' > "$HOME/.bashrc"
+        echo 'export PATH="$HOME/.bin:$PATH"' > "$HOME/.bashrc"
         PATH_UPDATED=true
     fi
     
     # Check and update .zshrc
     if [ -f "$HOME/.zshrc" ]; then
-        if ! grep -q "export PATH=\"\$HOME/bin:\$PATH\"" "$HOME/.zshrc"; then
-            print_info "Adding ~/bin to PATH in .zshrc..."
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.zshrc"
+        if ! grep -q "export PATH=\"\$HOME/.bin:\$PATH\"" "$HOME/.zshrc"; then
+            print_info "Adding ~/.bin to PATH in .zshrc..."
+            echo 'export PATH="$HOME/.bin:$PATH"' >> "$HOME/.zshrc"
             PATH_UPDATED=true
         else
-            print_info "~/bin already in PATH in .zshrc"
+            print_info "~/.bin already in PATH in .zshrc"
         fi
     else
         print_warning ".zshrc not found, creating it..."
-        echo 'export PATH="$HOME/bin:$PATH"' > "$HOME/.zshrc"
+        echo 'export PATH="$HOME/.bin:$PATH"' > "$HOME/.zshrc"
         PATH_UPDATED=true
     fi
 fi
@@ -480,9 +502,9 @@ echo ""
 print_info "You can now use 'dp-generator' command from anywhere in your terminal!"
 echo ""
 print_info "Installation details:"
-echo "  - Executable: ~/bin/dp-generator"
-echo "  - Supporting files: ~/bin/dp-generator-files/"
-echo "  - Templates: ~/bin/dp-generator-files/reference/"
+echo "  - Executable: ~/.bin/.dp-generator"
+echo "  - Supporting files: ~/.bin/.dp-generator-files/"
+echo "  - Templates: ~/.bin/.dp-generator-files/reference/"
 
 # macOS-specific post-installation notes
 if [[ "$(detect_os)" == "macos" ]]; then
