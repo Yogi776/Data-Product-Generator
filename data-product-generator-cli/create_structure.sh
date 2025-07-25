@@ -385,6 +385,102 @@ create_instance_secret_lens_config() {
     echo "Created instance-secret lens config file: $target_file"
 }
 
+# Function to create workflow failed monitor config file from template
+create_workflow_failed_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-workflow-failed-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created workflow failed monitor config file: $target_file"
+}
+
+# Function to create quality checks failed monitor config file from template
+create_quality_checks_failed_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-quality-checks-failed-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created quality checks failed monitor config file: $target_file"
+}
+
+# Function to create business rules lens monitor config file from template
+create_business_rules_lens_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-business-rules-lens-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created business rules lens monitor config file: $target_file"
+}
+
+# Function to create workflow failed pager config file from template
+create_workflow_failed_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-workflow-failed-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created workflow failed pager config file: $target_file"
+}
+
+# Function to create quality checks failed pager config file from template
+create_quality_checks_failed_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-quality-checks-failed-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created quality checks failed pager config file: $target_file"
+}
+
+# Function to create business rules lens pager config file from template
+create_business_rules_lens_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-business-rules-lens-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created business rules lens pager config file: $target_file"
+}
+
 # Function to create config YAML file with entity definitions
 create_config_yaml() {
     local target_file=$1
@@ -514,7 +610,8 @@ generate_codp() {
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/tables"
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/views"
     create_dir "$project_name/$consumption_layer/deploy"
-    create_dir "$project_name/$consumption_layer/observability"
+    create_dir "$project_name/$consumption_layer/observability/monitor"
+    create_dir "$project_name/$consumption_layer/observability/pager"
 
     # Create SQL files for each semantic entity if provided
     if [ -n "$semantic_entities" ]; then
@@ -563,6 +660,25 @@ generate_codp() {
     create_file "$project_name/$consumption_layer/deploy/config-data-product-scanner.yaml"
     create_bundle_config "$consumption_layer" "$project_name" "$project_name/$consumption_layer/deploy/config-$consumption_layer-bundle.yaml"
     create_deploy_config "$consumption_layer" "$project_name/$consumption_layer/deploy/config-$consumption_layer-dp.yaml"
+    
+    # Create observability configuration files (3 files per directory)
+    if [ -n "$semantic_entities" ]; then
+        # Use the first entity for template generation (or create generic templates)
+        IFS=',' read -ra SEMANTIC_ENTITIES_ARRAY <<< "$semantic_entities"
+        first_entity="${SEMANTIC_ENTITIES_ARRAY[0]}"
+        
+        # Create monitor files (3 files total)
+        create_workflow_failed_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-workflow-failed.yaml"
+        create_quality_checks_failed_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-quality-checks-failed.yaml"
+        create_business_rules_lens_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-business-rules-lens.yaml"
+        
+        # Create pager files (3 files total)
+        create_workflow_failed_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-workflow-failed.yaml"
+        create_quality_checks_failed_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-quality-checks-failed.yaml"
+        create_business_rules_lens_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-business-rules-lens.yaml"
+        
+        echo "Created observability configuration files (3 monitor + 3 pager files)"
+    fi
     
     echo "CODP structure created successfully for consumption layer: $consumption_layer"
 }
