@@ -370,6 +370,21 @@ create_deployment_yaml() {
     echo "Created/Updated deployment YAML file: $target_file"
 }
 
+# Function to create instance-secret lens config file from template
+create_instance_secret_lens_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-instance-secret-lens-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace only the entity_title variable in description, keep the rest as is
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created instance-secret lens config file: $target_file"
+}
+
 # Function to create config YAML file with entity definitions
 create_config_yaml() {
     local target_file=$1
@@ -493,6 +508,7 @@ generate_codp() {
     create_dir "$project_name/$consumption_layer/activation/custom-application"
     create_dir "$project_name/$consumption_layer/activation/data-apis"
     create_dir "$project_name/$consumption_layer/activation/notebook"
+    create_dir "$project_name/$consumption_layer/activation/instance-secret"
     create_dir "$project_name/$consumption_layer/build/access-control"
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/sqls"
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/tables"
@@ -533,6 +549,11 @@ generate_codp() {
             create_table_yaml "$entity" "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/tables/$entity.yaml" "$config_file"
         done
         echo "Created semantic entities: ${SEMANTIC_ENTITIES_ARRAY[*]}"
+        
+        # Create single instance-secret config file
+        echo "Creating instance-secret config file..."
+        create_instance_secret_lens_config "general" "$project_name/$consumption_layer/activation/instance-secret/config-instance-secret.yaml"
+        echo "Created instance-secret config file: config-instance-secret.yaml"
     fi
 
     # Create remaining configuration files

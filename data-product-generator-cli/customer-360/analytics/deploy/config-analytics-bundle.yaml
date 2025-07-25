@@ -1,0 +1,13 @@
+name: analytics-bundle
+version: v1beta
+type: bundle
+tags:
+  - Tier.Gold
+description: The purpose of the bundle is to deploy the resources of the analytics Data Product, making it available for consumption in analytics.
+layer: "user"
+bundle:
+  resources:
+    - id: analytics-pipeline
+      file: customer-360/analytics/deploy/pipeline.yaml
+      workspace: public
+

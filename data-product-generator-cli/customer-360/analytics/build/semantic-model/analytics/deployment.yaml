@@ -1,26 +1,20 @@
 ---
 version: v1alpha
-name: "${entity}" # TODO: change this to the correct name
+name: "analytics" # TODO: change this to the correct name
 layer: user
 type: lens
 tags:
   - Tier.Gold
-description: Deployment of ${entity} Lens2 for advanced monitoring and optimized management capabilities.
+description: Deployment of analytics Lens2 for advanced monitoring and optimized management capabilities.
 lens:
   compute: runnable-default
   secrets:
     - name: gitsecret # Secret name from instance-secret.yaml
       allKeys: true
   source:
-    type: minerva # case 1: minerva
+    type: minerva
     name: minervac
     catalog: icebase
-  # source: # case 2: flash
-  #   type: flash
-  #   name: exec-360-flash-service-v1
-  # source: # case 3: depot
-  #   type: depot 
-  #   name: snowflake
   repo:
     url: https://bitbucket.org/rubik_/solutions
     lensBaseDir: solutions/ # TODO: change this to the correct path
