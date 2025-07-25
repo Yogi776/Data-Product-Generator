@@ -1,0 +1,13 @@
+name: ${entity}-bundle
+version: v1beta
+type: bundle
+tags:
+  - Tier.Gold
+description: The purpose of the bundle is to deploy the resources of the ${entity} Data Product, making it available for consumption in ${entity}.
+layer: "user"
+bundle:
+  resources:
+    - id: ${entity}-pipeline
+      file: ${project_name}/${entity}/deploy/pipeline.yaml
+      workspace: public
+

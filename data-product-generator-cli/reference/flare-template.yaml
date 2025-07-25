@@ -1,0 +1,95 @@
+version: v1
+name: wf-${entity}-flare
+type: workflow
+tags:
+  - Tier.Gold
+description: This workflow is responsible for ingesting ${entity} for analysis from source into Lakehouse.
+workflow:
+  title: ${entity_title} Source Dataset
+  dag:
+    - name: ${entity}-flare
+      description: This workflow is responsible for ingesting ${entity} for analysis from source into Lakehouse.
+      title: ${entity_title} Source Dataset
+      spec:
+        tags:
+          - Tier.Gold
+        stack: flare:6.0
+        compute: runnable-default
+        stackSpec:
+          driver:
+            coreLimit: 1200m
+            cores: 1
+            memory: 1024m
+          executor:
+            coreLimit: 1200m
+            cores: 1
+            instances: 1
+            memory: 1024m
+          job:
+            explain: true
+            inputs:
+              - name: ${entity}_input
+                dataset: dataos://thirdparty01:sandbox/${entity}.json?acl=rw
+                format: json
+                options:
+                  multiLine: true
+
+              - name: ${entity}_input
+                dataset: dataos://thirdparty01:sandbox/${entity}.csv?acl=rw
+                format: csv
+                options:
+                  header: true
+                  inferSchema: true
+
+              - name: ${entity}_input
+                dataset: dataos://postgres:sandbox/${entity}?acl=rw
+                options:
+                  driver: org.postgresql.Driver
+                  
+              - name: ${entity}_input
+                dataset: dataos://bigquery:sandbox/${entity}?acl=rw
+                format: Bigquery
+            logLevel: INFO
+            outputs:
+              - name: ${entity}_final_dataset
+                dataset: dataos://${output_catalog}:sandbox/${entity}?acl=rw
+                format: Iceberg
+                description: The ${entity} table is a structured dataset that contains comprehensive information about various ${entity} within the organization. It serves as a central repository for ${entity} data, facilitating efficient management, analysis, and decision-making processes related to ${entity} operations, logistics, and customer engagement.
+                tags:
+                   - Tier.Gold
+                options:
+                  saveMode: overwrite
+#                  sort:
+#                    mode: partition
+#                    columns:
+#                      - name: created_at
+#                        order: desc
+#                    partitionSpec:
+#                      - type: month
+#                        column: created_at
+#                        name: month
+                  iceberg:
+                    properties:
+                      write.format.default: parquet
+                      write.metadata.compression-codec: gzip
+                title: ${entity_title} Source Dataset
+            steps:
+              - sequence:
+                  - name: ${entity}_final_dataset
+                    sql: |
+                      SELECT
+                        *
+                      FROM
+                        ${entity}_input
+                    functions:
+                      - name: cleanse_column_names
+                      - name: change_column_case
+                        case: lower
+                      - name: set_type
+                        columns:
+                          created_at: timestamp
+                          updated_at: timestamp
+                      - name: drop
+                        columns:
+                          - temp_column
+

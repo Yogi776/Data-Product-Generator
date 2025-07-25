@@ -1,0 +1,22 @@
+tables:
+  - name: ${entity}
+    sql: {{ load_sql('${entity}') }}
+    description: Comprehensive ${entity} data for business analytics, reporting, and operational insights
+    data_source: icebase
+    public: true
+    joins:
+      - name: ${entity}
+        relationship: one_to_many
+        sql: "{TABLE.${entity}_id}= {${entity}.${entity}_id}"
+    dimensions:
+      - name: ${entity}_id
+        description: "Primary business identifier for ${entity} used in data relationships and analytics"
+        type: string
+        sql: ${entity}_id
+        primary_key: true
+
+    measures:
+      - name: total_${entity}
+        sql: ${entity}_id
+        type: count
+        description: "Total count of ${entity} records for business metrics and KPI calculations"

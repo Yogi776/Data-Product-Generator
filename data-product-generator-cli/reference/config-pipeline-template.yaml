@@ -1,0 +1,26 @@
+version: v1
+name: wf-${entity}-pipeline
+type: workflow
+tags:
+  - Tier.Gold
+  - Domain.${entity}
+description: The "wf-${entity}-pipeline" is a data pipeline focused on processing ${entity} data. It involves stages such as data ingestion and quality assurance to derive insights.
+workflow:
+  # schedule:
+  #   cron: '0 2 * * 6'
+  #   concurrencyPolicy: Forbid
+  title: ${entity} Pipeline
+  dag: 
+    - name: ${entity}-ingestion
+      file: ${project_name}/${entity}/build/data-processing/config-${entity}-flare.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"
+
+    - name: ${entity}-quality
+      file: ${project_name}/${entity}/build/quality/config-${entity}-quality.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"        
+      dependencies:
+        - ${entity}-ingestion 

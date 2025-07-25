@@ -1,0 +1,49 @@
+logical_model: analytics
+source: icebase
+schema: retail
+
+# Entity definitions with columns and types
+entities:
+  customer:
+    dimensions:
+      - name: customer_id
+        type: number
+        primary_key: true
+      - name: customer_name
+        type: string
+      - name: customer_email
+        type: string
+      - name: customer_phone
+        type: string
+
+  product:
+    dimensions:
+      - name: product_id
+        type: number
+        primary_key: true
+      - name: product_name
+        type: string
+      - name: product_price
+        type: number
+      - name: product_category
+        type: string
+
+  transaction:
+    dimensions:
+      - name: transaction_id
+        type: number
+        primary_key: true
+      - name: customer_id
+        type: number
+      - name: product_id
+        type: number
+      - name: transaction_amount
+        type: number
+
+    joins:
+      - name: customer
+        relationship: many_to_one
+        sql: "{TABLE.customer_id} = {customer.customer_id}"
+      - name: product
+        relationship: many_to_one
+        sql: "{TABLE.product_id} = {product.product_id}" 
