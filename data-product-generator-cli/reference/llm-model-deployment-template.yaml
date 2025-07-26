@@ -1,0 +1,27 @@
+version: v1
+name: ${project_name}-llm
+type: service
+service:
+  replicas: 1
+  servicePort: 8501
+  compute: runnable-default
+  ingress:
+    enabled: true
+    noAuthentication: true
+    path: /lens2/llm/public:${project_name}-llm
+    stripPath: false    
+  stack: container
+  envs:
+    STREAMLIT_SERVER_BASE_URL_PATH: /lens2/llm/public:${project_name}-llm
+    question: "--config /etc/dataos/config/question.conf"
+    LENS_NAME: # Lens Name
+    DATAOS_FQDN: known-racer.mydataos.com
+  configs: 
+    question.conf: #path of example.txt file
+  stackSpec:
+    image: rubiklabs/llm_data_product:1.8
+    imagePullSecret: modern-docker-secret
+    command:
+      - streamlit
+      - run
+      - streamlit_app.py 

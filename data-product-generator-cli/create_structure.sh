@@ -481,6 +481,126 @@ create_business_rules_lens_pager_config() {
     echo "Created business rules lens pager config file: $target_file"
 }
 
+# Function to create data app Dockerfile
+create_data_app_dockerfile() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    cat > "$target_file" << 'EOF'
+# Multi-stage build for data application
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Start the application
+CMD ["npm", "start"]
+EOF
+
+    echo "Created data app Dockerfile: $target_file"
+}
+
+# Function to create data app deployment YAML
+create_data_app_deployment_yaml() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/data-app-deployment-template.yaml" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created data app deployment YAML: $target_file"
+}
+
+# Function to create LLM model deployment YAML
+create_llm_model_deployment_yaml() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/llm-model-deployment-template.yaml" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created LLM model deployment YAML: $target_file"
+}
+
+# Function to create LLM example configuration file
+create_llm_example_config() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/llm-example-template.txt" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created LLM example configuration: $target_file"
+}
+
+# Function to create docker secret config file
+create_docker_secret_config() {
+    local target_file=$1
+    
+    # Copy template (no variable substitution needed for this file)
+    cp "$REFERENCE_DIR/config-docker-secret-template.yaml" "$target_file"
+    
+    echo "Created docker secret config: $target_file"
+}
+
+# Function to create LLM secret config file
+create_llm_secret_config() {
+    local target_file=$1
+    
+    # Copy template (no variable substitution needed for this file)
+    cp "$REFERENCE_DIR/config-llm-secret-template.yaml" "$target_file"
+    
+    echo "Created LLM secret config: $target_file"
+}
+
 # Function to create config YAML file with entity definitions
 create_config_yaml() {
     local target_file=$1
@@ -602,6 +722,9 @@ generate_codp() {
     
     # Create CODP directory structure
     create_dir "$project_name/$consumption_layer/activation/custom-application"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/data-app"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/data-app/app"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/llm-model"
     create_dir "$project_name/$consumption_layer/activation/data-apis"
     create_dir "$project_name/$consumption_layer/activation/notebook"
     create_dir "$project_name/$consumption_layer/activation/instance-secret"
@@ -647,12 +770,25 @@ generate_codp() {
         done
         echo "Created semantic entities: ${SEMANTIC_ENTITIES_ARRAY[*]}"
         
-        # Create single instance-secret config file
-        echo "Creating instance-secret config file..."
+        # Create instance-secret config files
+        echo "Creating instance-secret config files..."
         create_instance_secret_lens_config "general" "$project_name/$consumption_layer/activation/instance-secret/config-instance-secret.yaml"
-        echo "Created instance-secret config file: config-instance-secret.yaml"
+        create_docker_secret_config "$project_name/$consumption_layer/activation/instance-secret/config-docker-secret.yaml"
+        create_llm_secret_config "$project_name/$consumption_layer/activation/instance-secret/config-llm-secret.yaml"
+        echo "Created instance-secret config files: config-instance-secret.yaml, config-docker-secret.yaml, config-llm-secret.yaml"
     fi
 
+    # Create data app files in custom-application
+    create_data_app_dockerfile "$project_name/$consumption_layer/activation/custom-application/data-app/Dockerfile" "$project_name" "$consumption_layer"
+    create_data_app_deployment_yaml "$project_name/$consumption_layer/activation/custom-application/data-app/deployment.yaml" "$project_name" "$consumption_layer"
+    
+    # Create LLM model files in custom-application
+    create_llm_model_deployment_yaml "$project_name/$consumption_layer/activation/custom-application/llm-model/deployment.yaml" "$project_name" "$consumption_layer"
+    
+    # Create configuration directory structure for LLM
+    create_dir "$project_name/$consumption_layer/build/activation/$project_name-llm/configuration"
+    create_llm_example_config "$project_name/$consumption_layer/build/activation/$project_name-llm/configuration/examples.txt" "$project_name" "$consumption_layer"
+    
     # Create remaining configuration files
     create_user_groups_yaml "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/user_groups.yml"
     create_deployment_yaml "$consumption_layer" "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/deployment.yaml"
