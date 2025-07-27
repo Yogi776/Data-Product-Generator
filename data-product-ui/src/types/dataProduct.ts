@@ -1,6 +1,8 @@
 export interface DataProduct {
   name: string;
   entity: string;
+  entities?: string[]; // For multiple entities in consumer-aligned products
+  type: 'source' | 'consumer';
   createdAt: Date;
 }
 

@@ -92,50 +92,63 @@ npm run dev
 
 ### Usage
 
-1. **Create Data Products**:
-   - Fill out the form on the left panel
-   - Enter a unique entity name (e.g., "customer", "product", "order")
-   - Add optional description, version, and author information
-   - Click "Create Data Product"
+1. **Configure Project**:
+   - Enter a unique project name
+   - Add multiple data product entities (e.g., "customer", "product", "order")
+   - Specify a consumption layer name (e.g., "customer-360")
+   - Optionally add custom semantic entities
 
-2. **View File Structure**:
-   - The right panel shows a live preview of the generated file structure
-   - Click on folders to expand/collapse the tree view
-   - See the complete SODP structure for all created data products
+2. **Preview Structure**:
+   - Click "Preview" to see the generated file structure
+   - The right panel shows a hierarchical view of all files
+   - See both source-aligned data products and consumer-aligned consumption layer
 
-3. **Download Files**:
-   - **Download JSON**: Get a JSON representation of the file structure
-   - **Download YAML**: Get a ZIP file containing all generated YAML configuration files
+3. **Generate Project**:
+   - Click "Generate Project" to create all YAML configuration files
+   - View generation results and success/error messages
+   - All files are generated according to the SODP structure
 
 ## Example Usage
 
-### Creating a Customer Data Product
+### Creating a Multi-Entity Data Product Project
 
-1. Fill the form:
-   - **Name**: "Customer Analytics"
-   - **Entity**: "customer"
-   - **Description**: "Customer data product for analytics and reporting"
-   - **Version**: "1.0.0"
-   - **Author**: "Data Team"
+1. Configure the project:
+   - **Project Name**: "customr"
+   - **Data Product Entities**: "customer", "product"
+   - **Consumption Layer**: "customer-360"
+   - **Custom Semantic Entities**: (optional, defaults to data product entities)
 
-2. Click "Create Data Product"
+2. Click "Preview" to see the structure
 
 3. The file structure will be generated:
    ```
-   customer/
-   ├── build/
-   │   ├── data-processing/
-   │   │   └── config-customer-flare.yaml
-   │   └── quality/
-   │       └── config-customer-quality.yaml
-   └── deploy/
-       ├── config-customer-scanner.yaml
-       ├── config-customer-bundle.yaml
-       ├── config-customer-dp.yaml
-       └── pipeline.yaml
+   customr/
+   ├── Data Products:
+   │   ├── customer/
+   │   │   ├── build/
+   │   │   │   ├── data-processing/config-customer-flare.yaml
+   │   │   │   └── quality/config-customer-quality.yaml
+   │   │   └── deploy/
+   │   │       ├── config-customer-scanner.yaml
+   │   │       ├── config-customer-bundle.yaml
+   │   │       ├── config-customer-dp.yaml
+   │   │       └── pipeline.yaml
+   │   └── product/
+   │       ├── build/
+   │       └── deploy/
+   └── Consumption Layer: customer-360/
+       ├── activation/
+       ├── build/
+       │   ├── access-control/
+       │   └── semantic-model/customer-360/model/
+       │       ├── sqls/ (2 files)
+       │       ├── tables/ (2 files)
+       │       └── ...
+       ├── deploy/
+       └── observability/
    ```
 
-4. Download the YAML files to get the complete configuration
+4. Click "Generate Project" to create all configuration files
 
 ## Technology Stack
 
@@ -160,11 +173,8 @@ npm run dev
 src/
 ├── app/
 │   ├── layout.tsx          # Root layout
-│   ├── page.tsx            # Main application page
+│   ├── page.tsx            # Main application page with interactive generator
 │   └── globals.css         # Global styles
-├── components/
-│   ├── DataProductForm.tsx # Form component for creating data products
-│   └── FileTreePreview.tsx # File tree visualization component
 ├── types/
 │   └── dataProduct.ts      # TypeScript type definitions
 └── utils/
