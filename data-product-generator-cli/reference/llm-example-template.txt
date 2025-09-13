@@ -1,0 +1,1 @@
+QUESTION:"What is the average probability of failure for each device family?,ANSWER:{"measures":["failure_disk_prediction.avg_failure_probability"],"dimensions":["device_data.device_family"],"segments":[],"filters":[],"timeDimensions":[],"limit":10,"offset":0}

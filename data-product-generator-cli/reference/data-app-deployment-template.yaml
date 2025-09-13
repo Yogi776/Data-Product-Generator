@@ -1,0 +1,31 @@
+version: v1
+name: ${project_name}-application
+type: service
+service:
+  replicas: 1
+  servicePort: 8501
+  compute: runnable-default
+  ingress:
+    enabled: true
+    noAuthentication: true
+    path: /${project_name}
+    stripPath: false
+  stack: container
+  envs:
+    STREAMLIT_SERVER_BASE_URL_PATH: ${project_name}
+    API_TOKEN:
+    DATAOS_FQDN:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 212Mi
+    limits:
+      cpu: 1000m
+      memory:  1024Mi
+  stackSpec:
+    image: rubiklabs/lakehouse-data-ingestion:1.10
+    imagePullSecret: modern-docker-secret
+    command:
+      - streamlit
+      - run
+      - streamlit.py 

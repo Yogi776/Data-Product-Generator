@@ -1,0 +1,62 @@
+name: depletion-actual-percent-change-alert-pager
+version: v1alpha
+type: pager
+tags:
+  - dataos:type:resource
+description: This is for sending Alerts on Microsoft Teams Alert Test Channel.
+workspace: public
+pager:
+  conditions:
+    - valueJqFilter: .properties.name
+      operator: equals
+      value: depletion_actual_percent_change
+  output:
+    webHook: 
+      url: https://rubikdatasolutions.webhook.office.com/webhookb2/23d5940d-c519-40db-8e75-875f3802e790@2e22bdde-3ec2-43f5-bf92-78e9f35a44fb/IncomingWebhook/aee8b3375ce94b5e8742f845c5bf18a6/07c3d4b1-971d-456e-bd7b-6a17522de08b/V2nHwZfwewJCARReddEt65VGxrXTuvJGBjpoTrve9lbHY1
+      verb: post
+      headers:
+        content-type: application/json
+      templateType: liquid
+      bodyTemplate: |
+       {
+          "@type": "MessageCard",
+          "summary": "📊 Business Alert: {{ properties.name | replace: '_', ' ' | capitalize }}",
+          "themeColor": "{% if properties.severity == 'critical' %}FF0000{% elsif properties.severity == 'warning' %}FFA500{% else %}0076D7{% endif %}",
+          "sections": [
+            {
+              "activityTitle": "🚨 Business Metric Alert",
+              "activitySubtitle": "{{ properties.category | capitalize }} threshold exceeded - Action Required",
+              "facts": [
+                {
+                  "name": "Metric:",
+                  "value": "{{ properties.name | replace: '_', ' ' | capitalize }}"
+                },
+                {
+                  "name": "Current Value:",
+                  "value": "{{ equationContext.queryExpressions[0].leftExpressionValue }}%"
+                },
+                {
+                  "name": "Threshold:",
+                  "value": "{{ equationContext.queryExpressions[0].rightExpressionValue }}%"
+                },
+                {
+                  "name": "Alert Time:",
+                  "value": "{{ createTime | date: '%b %d, %Y at %I:%M %p UTC' }}"
+                },
+                {
+                  "name": "Priority:",
+                  "value": "{{ properties.severity | capitalize }}"
+                }
+              ]
+            },
+            {
+              "text": "**Business Impact:**\nThis alert indicates that {{ properties.name | replace: '_', ' ' | capitalize }} has exceeded the expected threshold of {{ equationContext.queryExpressions[0].rightExpressionValue }}%. The current value of {{ equationContext.queryExpressions[0].leftExpressionValue }}% requires immediate attention."
+            },
+            {
+              "text": "**Recommended Actions:**\n• Review recent business activities that may have caused this change\n• Check related operational metrics for correlation\n• Consider if this represents a trend or isolated event\n• Contact the data team if you need additional analysis"
+            },
+            {
+              "text": "For detailed analysis or to adjust alert thresholds, please contact the Data Operations team."
+            }
+          ]
+        }

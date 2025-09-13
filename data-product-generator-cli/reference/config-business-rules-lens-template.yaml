@@ -1,0 +1,40 @@
+name: depletion-actual-percent-change-alert-monitor
+version: v1alpha
+type: monitor
+monitor:
+  schedule: '0 0 31 * *'
+  type: equation_monitor
+  equation:
+    leftExpression:
+      queryCoefficient: 1
+      queryConstant: 0
+      query:
+        type: lens
+        lens:
+          dataOsInstance:
+            name: exec-360-flash
+            workspace: public
+            sslmode: 'disable'
+        ql: 
+          SELECT 
+            MEASURE(retailer_depletion.depletion_actual_percent_change) as depletion_actual_percent_change
+            FROM
+              retailer_depletion
+            LIMIT 
+              10
+            OFFSET 
+              0
+        comparisonColumn: {
+            name: depletion_actual_percent_change, # The column that you consider as the comparision column, the value of this columns will be matched against the value of the right hand expression.
+            dataType: int64 # The data type
+        }
+    rightExpression:
+      queryCoefficient: 0
+      queryConstant: 20
+      query:
+    operator: greater_than_equals
+  incident:
+    type: business-metric
+    name: depletion_actual_percent_change
+    category: equation
+    severity: info

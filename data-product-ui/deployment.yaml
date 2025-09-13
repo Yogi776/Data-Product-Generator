@@ -1,0 +1,23 @@
+version: v1
+name: data-product-generator
+type: service
+service:
+  replicas: 1
+  servicePort: 3000
+  ingress:
+    enabled: true
+    noAuthentication: true
+    path: /data-product-generator
+    stripPath: false
+  stack: container
+  compute: runnable-default
+  envs:
+    LOG_LEVEL: info
+    NEXT_PUBLIC_BASE_PATH: /data-product-generator
+  stackSpec:
+    image: rubiklabs/data-product-generator:1.2
+    imagePullSecret: modern-docker-secret
+    command:
+      - node
+    arguments:
+      - server.js

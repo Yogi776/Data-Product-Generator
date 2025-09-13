@@ -385,6 +385,195 @@ create_instance_secret_lens_config() {
     echo "Created instance-secret lens config file: $target_file"
 }
 
+# Function to create workflow failed monitor config file from template
+create_workflow_failed_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-workflow-failed-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created workflow failed monitor config file: $target_file"
+}
+
+# Function to create quality checks failed monitor config file from template
+create_quality_checks_failed_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-quality-checks-failed-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created quality checks failed monitor config file: $target_file"
+}
+
+# Function to create business rules lens monitor config file from template
+create_business_rules_lens_monitor_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-business-rules-lens-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created business rules lens monitor config file: $target_file"
+}
+
+# Function to create workflow failed pager config file from template
+create_workflow_failed_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-workflow-failed-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created workflow failed pager config file: $target_file"
+}
+
+# Function to create quality checks failed pager config file from template
+create_quality_checks_failed_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-quality-checks-failed-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created quality checks failed pager config file: $target_file"
+}
+
+# Function to create business rules lens pager config file from template
+create_business_rules_lens_pager_config() {
+    local entity=$1
+    local target_file=$2
+    
+    cp "$REFERENCE_DIR/config-business-rules-lens-pager-template.yaml" "$target_file"
+    # Create capitalized version of entity name for titles (first letter uppercase, rest lowercase)
+    local first_char=$(echo "$entity" | cut -c1 | tr '[:lower:]' '[:upper:]')
+    local rest_of_word=$(echo "$entity" | cut -c2- | tr '[:upper:]' '[:lower:]')
+    local entity_title="${first_char}${rest_of_word}"
+    # Replace template variables with actual values
+    sed -i '' "s/\${entity}/$entity/g" "$target_file"
+    sed -i '' "s/\${entity_title}/$entity_title/g" "$target_file"
+    echo "Created business rules lens pager config file: $target_file"
+}
+
+# Function to create data app Dockerfile
+create_data_app_dockerfile() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    cat > "$target_file" << 'EOF'
+FROM python:3.9-slim
+
+COPY ./app /app
+WORKDIR /app
+
+RUN pip install -r requirements.txt
+
+COPY . .
+
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+EOF
+
+    echo "Created data app Dockerfile: $target_file"
+}
+
+# Function to create data app deployment YAML
+create_data_app_deployment_yaml() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/data-app-deployment-template.yaml" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created data app deployment YAML: $target_file"
+}
+
+# Function to create requirements.txt file
+create_requirements_txt() {
+    local target_file=$1
+    
+    # Create empty requirements.txt file
+    touch "$target_file"
+    echo "Created requirements.txt file: $target_file"
+}
+
+# Function to create LLM model deployment YAML
+create_llm_model_deployment_yaml() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/llm-model-deployment-template.yaml" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created LLM model deployment YAML: $target_file"
+}
+
+# Function to create LLM example configuration file
+create_llm_example_config() {
+    local target_file=$1
+    local project_name=$2
+    local consumption_layer=$3
+    
+    # Copy template and replace variables
+    cp "$REFERENCE_DIR/llm-example-template.txt" "$target_file"
+    sed -i '' "s/\${project_name}/$project_name/g" "$target_file"
+    sed -i '' "s/\${consumption_layer}/$consumption_layer/g" "$target_file"
+    
+    echo "Created LLM example configuration: $target_file"
+}
+
+# Function to create docker secret config file
+create_docker_secret_config() {
+    local target_file=$1
+    
+    # Copy template (no variable substitution needed for this file)
+    cp "$REFERENCE_DIR/config-docker-secret-template.yaml" "$target_file"
+    
+    echo "Created docker secret config: $target_file"
+}
+
+# Function to create LLM secret config file
+create_llm_secret_config() {
+    local target_file=$1
+    
+    # Copy template (no variable substitution needed for this file)
+    cp "$REFERENCE_DIR/config-llm-secret-template.yaml" "$target_file"
+    
+    echo "Created LLM secret config: $target_file"
+}
+
 # Function to create config YAML file with entity definitions
 create_config_yaml() {
     local target_file=$1
@@ -506,6 +695,9 @@ generate_codp() {
     
     # Create CODP directory structure
     create_dir "$project_name/$consumption_layer/activation/custom-application"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/data-app"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/data-app/app"
+    create_dir "$project_name/$consumption_layer/activation/custom-application/llm-model"
     create_dir "$project_name/$consumption_layer/activation/data-apis"
     create_dir "$project_name/$consumption_layer/activation/notebook"
     create_dir "$project_name/$consumption_layer/activation/instance-secret"
@@ -514,7 +706,8 @@ generate_codp() {
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/tables"
     create_dir "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/views"
     create_dir "$project_name/$consumption_layer/deploy"
-    create_dir "$project_name/$consumption_layer/observability"
+    create_dir "$project_name/$consumption_layer/observability/monitor"
+    create_dir "$project_name/$consumption_layer/observability/pager"
 
     # Create SQL files for each semantic entity if provided
     if [ -n "$semantic_entities" ]; then
@@ -550,12 +743,22 @@ generate_codp() {
         done
         echo "Created semantic entities: ${SEMANTIC_ENTITIES_ARRAY[*]}"
         
-        # Create single instance-secret config file
-        echo "Creating instance-secret config file..."
+        # Create instance-secret config files
+        echo "Creating instance-secret config files..."
         create_instance_secret_lens_config "general" "$project_name/$consumption_layer/activation/instance-secret/config-instance-secret.yaml"
-        echo "Created instance-secret config file: config-instance-secret.yaml"
+        create_docker_secret_config "$project_name/$consumption_layer/activation/instance-secret/config-docker-secret.yaml"
+        create_llm_secret_config "$project_name/$consumption_layer/activation/instance-secret/config-llm-secret.yaml"
+        echo "Created instance-secret config files: config-instance-secret.yaml, config-docker-secret.yaml, config-llm-secret.yaml"
     fi
 
+    # Create data app files in custom-application
+    create_data_app_dockerfile "$project_name/$consumption_layer/activation/custom-application/data-app/Dockerfile" "$project_name" "$consumption_layer"
+    create_data_app_deployment_yaml "$project_name/$consumption_layer/activation/custom-application/data-app/deployment.yaml" "$project_name" "$consumption_layer"
+    create_requirements_txt "$project_name/$consumption_layer/activation/custom-application/data-app/app/requirements.txt"
+    
+    # Create LLM model files in custom-application
+    create_llm_model_deployment_yaml "$project_name/$consumption_layer/activation/custom-application/llm-model/deployment.yaml" "$project_name" "$consumption_layer"
+    
     # Create remaining configuration files
     create_user_groups_yaml "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/model/user_groups.yml"
     create_deployment_yaml "$consumption_layer" "$project_name/$consumption_layer/build/semantic-model/$consumption_layer/deployment.yaml"
@@ -563,6 +766,25 @@ generate_codp() {
     create_file "$project_name/$consumption_layer/deploy/config-data-product-scanner.yaml"
     create_bundle_config "$consumption_layer" "$project_name" "$project_name/$consumption_layer/deploy/config-$consumption_layer-bundle.yaml"
     create_deploy_config "$consumption_layer" "$project_name/$consumption_layer/deploy/config-$consumption_layer-dp.yaml"
+    
+    # Create observability configuration files (3 files per directory)
+    if [ -n "$semantic_entities" ]; then
+        # Use the first entity for template generation (or create generic templates)
+        IFS=',' read -ra SEMANTIC_ENTITIES_ARRAY <<< "$semantic_entities"
+        first_entity="${SEMANTIC_ENTITIES_ARRAY[0]}"
+        
+        # Create monitor files (3 files total)
+        create_workflow_failed_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-workflow-failed.yaml"
+        create_quality_checks_failed_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-quality-checks-failed.yaml"
+        create_business_rules_lens_monitor_config "$first_entity" "$project_name/$consumption_layer/observability/monitor/config-business-rules-lens.yaml"
+        
+        # Create pager files (3 files total)
+        create_workflow_failed_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-workflow-failed.yaml"
+        create_quality_checks_failed_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-quality-checks-failed.yaml"
+        create_business_rules_lens_pager_config "$first_entity" "$project_name/$consumption_layer/observability/pager/config-business-rules-lens.yaml"
+        
+        echo "Created observability configuration files (3 monitor + 3 pager files)"
+    fi
     
     echo "CODP structure created successfully for consumption layer: $consumption_layer"
 }
