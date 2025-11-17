@@ -1,9 +1,0 @@
-user_groups:
-  - name: default
-    api_scopes:
-      - meta
-      - data
-      - graphql
-      - jobs
-      - source
-    includes: "*"

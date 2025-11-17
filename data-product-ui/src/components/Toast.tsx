@@ -82,8 +82,16 @@ export function Toast({ type, message, details, onClose, duration = 5000 }: Toas
   );
 }
 
+export interface ToastData {
+  id: string;
+  type: ToastType;
+  message: string;
+  details?: string;
+  duration?: number;
+}
+
 export interface ToastContainerProps {
-  toasts: Array<ToastProps & { id: string }>;
+  toasts: ToastData[];
   removeToast: (id: string) => void;
 }
 

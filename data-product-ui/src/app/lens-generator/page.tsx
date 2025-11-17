@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import JSZip from 'jszip';
-import { ToastContainer, ToastType } from '@/components/Toast';
+import { ToastContainer, ToastType, ToastData } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface Dimension {
@@ -57,7 +57,7 @@ export default function LensGenerator() {
   const [showSqlParser, setShowSqlParser] = useState(false);
 
   // Toast notification state
-  const [toasts, setToasts] = useState<Array<{ id: string; type: ToastType; message: string; details?: string; duration?: number }>>([]);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -301,7 +301,7 @@ export default function LensGenerator() {
       }
 
       // Extract columns from SELECT clause only (before FROM)
-      const selectMatch = cleanSql.match(/SELECT\s+(.*?)\s+FROM/is);
+      const selectMatch = cleanSql.match(/SELECT\s+([\s\S]*?)\s+FROM/i);
       if (!selectMatch) {
         showError('Invalid SELECT query', 'Could not parse SQL query. Please ensure it has SELECT ... FROM structure.');
         return;
@@ -783,10 +783,25 @@ export default function LensGenerator() {
 
   // Generate SQL file
   const generateSQLFile = (table: Table): string => {
+    // Generate column list from dimensions
+    const columns = table.dimensions.map(dim => {
+      // If SQL expression is different from name, use it with alias
+      if (dim.sql && dim.sql !== dim.name) {
+        return `  ${dim.sql} as ${dim.name}`;
+      }
+      // Otherwise just use the column name
+      return `  ${dim.name}`;
+    }).join(',\n');
+
+    // Build FROM clause - always include full path (data_source.schema.table_name)
+    const dataSource = table.data_source || 'icebase';
+    const schema = table.schema || 'sandbox';
+    const fromClause = `${dataSource}.${schema}.${table.name}`;
+
     return `SELECT
-  *
+${columns}
 FROM
-  lakehouse.${table.schema}.${table.name}
+  ${fromClause}
 `;
   };
 
@@ -1046,53 +1061,40 @@ lens:
         {/* Project Configuration */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Project Configuration</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Name *
-              </label>
-              <input
-                type="text"
-                value={config.project_name}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setConfig(prev => ({ ...prev, project_name: value }));
-                  
-                  // Show validation error if not empty and invalid
-                  if (value && !validateProjectName(value).valid) {
-                    const validation = validateProjectName(value);
-                    if (validation.error) {
-                      // Don't show toast on every keystroke, just visual feedback
-                    }
+          <div className="max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Project Name *
+            </label>
+            <input
+              type="text"
+              value={config.project_name}
+              onChange={(e) => {
+                const value = e.target.value;
+                setConfig(prev => ({ ...prev, project_name: value }));
+                
+                // Show validation error if not empty and invalid
+                if (value && !validateProjectName(value).valid) {
+                  const validation = validateProjectName(value);
+                  if (validation.error) {
+                    // Don't show toast on every keystroke, just visual feedback
                   }
-                }}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                  config.project_name && !validateProjectName(config.project_name).valid
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-gray-300 focus:ring-purple-500'
-                }`}
-                placeholder="customer-360"
-              />
-              {config.project_name && !validateProjectName(config.project_name).valid && (
-                <p className="text-xs text-red-600 mt-1">
-                  {validateProjectName(config.project_name).error}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Source
-              </label>
-              <input
-                type="text"
-                value={config.source}
-                onChange={(e) =>
-                  setConfig(prev => ({ ...prev, source: e.target.value }))
                 }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="icebase"
-              />
-            </div>
+              }}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                config.project_name && !validateProjectName(config.project_name).valid
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-purple-500'
+              }`}
+              placeholder="customer-360"
+            />
+            {config.project_name && !validateProjectName(config.project_name).valid && (
+              <p className="text-xs text-red-600 mt-1">
+                {validateProjectName(config.project_name).error}
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              Data will be sourced from: <span className="font-mono text-purple-600">icebase.sandbox</span>
+            </p>
           </div>
         </div>
 
@@ -1263,12 +1265,8 @@ lens:
                 </h3>
                 <div className="space-y-2 text-xs text-blue-800">
                   <div className="flex items-center justify-between bg-white bg-opacity-50 rounded px-3 py-2">
-                    <span className="font-medium">Schema:</span>
-                    <span className="text-blue-900">{config.tables[selectedTable].schema || 'sandbox'}</span>
-                  </div>
-                  <div className="flex items-center justify-between bg-white bg-opacity-50 rounded px-3 py-2">
-                    <span className="font-medium">Data Source:</span>
-                    <span className="text-blue-900">{config.tables[selectedTable].data_source || 'icebase'}</span>
+                    <span className="font-medium">SQL Path:</span>
+                    <span className="text-blue-900 font-mono">icebase.sandbox.{config.tables[selectedTable].name}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <div className="bg-blue-100 rounded px-2 py-1.5 text-center">
@@ -1336,35 +1334,22 @@ lens:
                   Table: {config.tables[selectedTable].name || 'Unnamed'}
                 </h2>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <input
-                      type="text"
-                      value={config.tables[selectedTable].description}
-                      onChange={(e) =>
-                        updateTable(selectedTable, 'description', e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="Table description"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Schema
-                    </label>
-                    <input
-                      type="text"
-                      value={config.tables[selectedTable].schema}
-                      onChange={(e) =>
-                        updateTable(selectedTable, 'schema', e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="sandbox"
-                    />
-                  </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={config.tables[selectedTable].description}
+                    onChange={(e) =>
+                      updateTable(selectedTable, 'description', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Table description"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    SQL will be generated from: <span className="font-mono text-purple-600">icebase.sandbox.{config.tables[selectedTable].name}</span>
+                  </p>
                 </div>
 
                 {/* Tabs */}
