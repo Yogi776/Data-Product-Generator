@@ -1,0 +1,49 @@
+version: v1alpha
+name: customer-360
+type: lens
+tags:
+  - lens
+description: Lens deployment for customer-360
+lens:
+  compute: runnable-default
+  secrets:
+    - name: bitbucket-r
+      allKeys: true
+  source:
+    type: minerva
+    name: system
+    catalog: icebase
+  repo:
+    url: https://bitbucket.org/tmdc/lens2
+    lensBaseDir: customer-360/model
+    syncFlags:
+      - --ref=lens2-dev
+  api:
+    replicas: 1
+    logLevel: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 2048Mi
+  worker:
+    replicas: 1
+    logLevel: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 2048Mi
+  router:
+    logLevel: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 2048Mi

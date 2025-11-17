@@ -1,0 +1,92 @@
+tables:
+  - name: battery
+    sql: {{ load_sql('battery') }}
+    description: Comprehensive battery data for business analytics, reporting, and operational insights
+    data_source: icebase
+    public: true
+
+    joins:
+    dimensions:
+      - name: uuid
+        description: "Unique identifier for battery"
+        type: string
+        sql: uuid
+        primary_key: true
+
+      - name: device_id
+        description: "Unique identifier for battery"
+        type: string
+        sql: d_id
+        primary_key: true
+
+      - name: battery_condition
+        description: "Battery Condition"
+        type: string
+        sql: battery_condition
+
+      - name: condition_reason
+        description: "Condition Reason"
+        type: string
+        sql: condition_reason
+
+      - name: battery_cycle_count
+        description: "Count value for battery cycle count"
+        type: number
+        sql: battery_cycle_count
+
+      - name: battery_design_capacity
+        description: "Battery Design Capacity"
+        type: number
+        sql: battery_design_capacity
+
+      - name: battery_firstused_date
+        description: "Date when battery was created or recorded"
+        type: time
+        sql: battery_firstused_date
+
+      - name: battery_fullcharge_capacity
+        description: "Battery Fullcharge Capacity"
+        type: number
+        sql: battery_fullcharge_capacity
+
+      - name: battery_manufacture_date
+        description: "Date when battery was created or recorded"
+        type: time
+        sql: battery_manufacture_date
+
+      - name: battery_manufacture_name
+        description: "Name of the battery"
+        type: string
+        sql: battery_manufacture_name
+
+      - name: battery_remaining_capacity
+        description: "Battery Remaining Capacity"
+        type: number
+        sql: battery_remaining_capacity
+
+      - name: battery_serial_number
+        description: "Battery Serial Number"
+        type: string
+        sql: battery_serial_number
+
+      - name: timestamp
+        description: "Timestamp for battery record"
+        type: time
+        sql: timestamp
+
+      - name: battery_warranty_date
+        description: "Date when battery was created or recorded"
+        type: time
+        sql: battery_warranty_date
+
+      - name: battery_warranty_status
+        description: "Current status of battery"
+        type: string
+        sql: battery_warranty_status
+
+    measures:
+      - name: total_battery
+        sql: uuid
+        type: count
+        description: "Total count of battery records"
+

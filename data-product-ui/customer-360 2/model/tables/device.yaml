@@ -1,0 +1,122 @@
+tables:
+  - name: device
+    sql: {{ load_sql('device') }}
+    description: Comprehensive device data for business analytics, reporting, and operational insights
+    data_source: icebase
+    public: true
+
+    joins:
+      - name: battery
+        relationship: one_to_many
+        sql: "{TABLE.device_id} = {battery.device_id}"
+
+    dimensions:
+      - name: uuid
+        description: "Unique identifier for device"
+        type: string
+        sql: uuid
+        primary_key: true
+
+      - name: device_id
+        description: "Unique identifier for device"
+        type: string
+        sql: d_id
+        primary_key: true
+
+      - name: d_org_id
+        description: "Unique identifier for device"
+        type: string
+        sql: d_org_id
+        primary_key: true
+
+      - name: manufacturer
+        description: "Manufacturer"
+        type: string
+        sql: manufacturer
+
+      - name: device_model
+        description: "Device Model"
+        type: string
+        sql: model
+
+      - name: device_name
+        description: "Name of the device"
+        type: string
+        sql: name
+
+      - name: serial_number
+        description: "Serial Number"
+        type: string
+        sql: serial_number
+
+      - name: registration_status
+        description: "Current status of device"
+        type: string
+        sql: registration_status
+
+      - name: tenant
+        description: "Tenant"
+        type: string
+        sql: tenant
+
+      - name: family
+        description: "Family"
+        type: string
+        sql: family
+
+      - name: enclosure_type
+        description: "Type or category of device"
+        type: string
+        sql: enclosure_type
+
+      - name: device_status
+        description: "Current status of device"
+        type: string
+        sql: STATUS
+
+      - name: platform
+        description: "Platform"
+        type: string
+        sql: platform
+
+      - name: last_heartbeat_at
+        description: "Last Heartbeat At"
+        type: string
+        sql: last_heartbeat_at
+
+      - name: main_agent_version
+        description: "Main Agent Version"
+        type: string
+        sql: main_agent_version
+
+      - name: device_state
+        description: "Device State"
+        type: string
+        sql: device_state
+
+      - name: cpu_architecture
+        description: "Cpu Architecture"
+        type: string
+        sql: cpu_architecture
+
+      - name: os_architecture
+        description: "Os Architecture"
+        type: string
+        sql: os_architecture
+
+      - name: country_name
+        description: "Name of the device"
+        type: number
+        sql: country_name
+
+      - name: created_date
+        description: "Date when device was created or recorded"
+        type: time
+        sql: created_date
+
+    measures:
+      - name: total_device
+        sql: uuid
+        type: count
+        description: "Total count of device records"
+
