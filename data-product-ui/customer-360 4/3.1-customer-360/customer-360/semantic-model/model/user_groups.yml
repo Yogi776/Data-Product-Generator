@@ -1,0 +1,9 @@
+user_groups:
+  - name: reader
+    api_scopes:
+      - meta
+      - data
+      - graphql
+      - jobs
+      - source
+    includes: "*"

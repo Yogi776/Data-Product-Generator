@@ -1,0 +1,26 @@
+version: v1
+name: wf-customers-pipeline
+type: workflow
+tags:
+  - Tier.Gold
+  - Domain.customers
+description: The "wf-customers-pipeline" is a data pipeline focused on processing customers data. It involves stages such as data ingestion and quality assurance to derive insights.
+workflow:
+  # schedule:
+  #   cron: '0 2 * * 6'
+  #   concurrencyPolicy: Forbid
+  title: customers Pipeline
+  dag: 
+    - name: customers-ingestion
+      file: customers/customers/build/data-processing/config-customers-flare.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"
+
+    - name: customers-quality
+      file: customers/customers/build/quality/config-customers-quality.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"        
+      dependencies:
+        - customers-ingestion

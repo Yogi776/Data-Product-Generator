@@ -1,0 +1,25 @@
+depots:
+  oracle:
+    type: oracle
+    options:
+      driver: oracle.jdbc.driver.OracleDriver
+
+  mysql:
+    type: mysql
+    options:
+      driver: com.mysql.cj.jdbc.Driver
+
+  postgres:
+    type: postgres
+    options:
+      driver: org.postgresql.Driver
+
+  mssql:
+    type: mssql
+    options:
+      driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+  snowflake:
+    type: snowflake
+    options:
+      sfWarehouse: "COMPUTE_WH"

@@ -1,0 +1,11 @@
+name: customer_data_market_place
+description: A talos app for customer data market place API
+version: 0.0.1
+logLevel: DEBUG
+auth:
+    heimdallUrl: https://known-racer.mydataos.com/heimdall
+cachePath: /tmp    
+sources:
+    - name: customer_data_market_place
+      type: lens
+      lensName: 'public:customer-data-market-place'  

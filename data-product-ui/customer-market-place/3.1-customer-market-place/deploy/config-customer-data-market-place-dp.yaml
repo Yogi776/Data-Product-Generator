@@ -1,0 +1,45 @@
+name: customer-data-market-place-dp
+version: v1beta
+type: data
+description: |
+  customer-market-place consumer-aligned data product delivers business-ready analytics and insights, enabling data-driven decision making and operational excellence.
+tags:
+  - DPUsecase.Customer Data Market Place
+  - DPTier.Consumer Aligned
+  - DPDomain.Data Market Place
+purpose: |
+  Enables business users to make informed decisions by providing clean, aggregated, and business-ready data for reporting, analytics, and operational dashboards.
+v1beta:
+  data:
+    meta:
+      title: Customer Data Market Place
+      sourceCodeUrl: https://bitbucket.org/rubik_/npa-early-warning-system/src/main/customer-market-place
+    collaborators:
+      - name: yogeshkhangode
+        description: owner
+      - name: kishanmahajan
+        description: developer
+    resource:
+      refType: dataos
+      ref: bundle:v1beta:npa-early-warning-bundle
+    inputs:
+      - refType: dataos
+        ref: dataset:icebase:data_market_place:customers
+
+      - refType: dataos
+        ref: dataset:icebase:data_market_place:transactions
+
+    ports:
+      rest:
+        - url: https://known-racer.mydataos.com/api/v2/rest
+          meta:
+            description: REST API access for customer market place data operations
+
+      lens:
+        ref: lens:v1alpha:customer-data-market-place:public  
+        refType: dataos
+
+
+      talos:
+        ref: service:v1:credit-debit-ratio-api:public
+        refType: dataos

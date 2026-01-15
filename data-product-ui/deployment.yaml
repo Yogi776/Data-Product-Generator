@@ -15,7 +15,7 @@ service:
     LOG_LEVEL: info
     NEXT_PUBLIC_BASE_PATH: /data-product-generator
   stackSpec:
-    image: rubiklabs/data-product-generator:1.2
+    image: rubiklabs/data-product-generator:1.3
     imagePullSecret: modern-docker-secret
     command:
       - node

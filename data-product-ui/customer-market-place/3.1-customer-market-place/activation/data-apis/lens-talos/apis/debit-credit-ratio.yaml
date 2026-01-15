@@ -1,0 +1,19 @@
+urlPath: /debit_credit_ratio_api
+description: Get customer transaction debit to credit ratio analysis by zone, city, branch, and channel
+response : 
+    - name: zone
+      description: Geographic zone where the customer is located, used for regional analysis and segmentation.
+
+    - name: city
+      description: City location of the customer, providing granular geographic insights for transaction analysis.
+
+    - name: branch_name
+      description: Name of the branch associated with the customer, used for branch-level performance tracking.
+
+    - name: channel
+      description: Transaction channel used (e.g., Online, Branch, ATM, Mobile), indicating customer interaction method.
+
+    - name: debit_to_credit_ratio
+      description: Calculated ratio of debit transactions to credit transactions, indicating customer spending vs income patterns and financial behavior.
+source: customer_data_market_place
+

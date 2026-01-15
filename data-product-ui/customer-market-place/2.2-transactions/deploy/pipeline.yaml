@@ -1,0 +1,26 @@
+version: v1
+name: wf-transactions-pipeline
+type: workflow
+tags:
+  - Tier.Gold
+  - Domain.transactions
+description: The "wf-transactions-pipeline" is a data pipeline focused on processing transactions data. It involves stages such as data ingestion and quality assurance to derive insights.
+workflow:
+  # schedule:
+  #   cron: '0 2 * * 6'
+  #   concurrencyPolicy: Forbid
+  title: transactions Pipeline
+  dag: 
+    - name: transactions-ingestion
+      file: transactions/transactions/build/data-processing/config-transactions-flare.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"
+
+    - name: transactions-quality
+      file: transactions/transactions/build/quality/config-transactions-quality.yaml
+      retry: 
+        count: 2
+        strategy: "OnFailure"        
+      dependencies:
+        - transactions-ingestion

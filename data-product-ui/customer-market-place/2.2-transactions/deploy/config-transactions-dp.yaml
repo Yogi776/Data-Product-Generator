@@ -1,0 +1,29 @@
+name: transactions-v2-dp
+version: v1beta
+type: data
+description: |
+  transactions delivers structured, time-stamped event data that reveals key operational signals, enabling observability and data-driven optimization.
+tags:
+  - DPUsecase.Customer Data Market Place
+  - DPTier.Source Aligned
+  - DPDomain.Data Market Place
+purpose: |
+  Enables faster decisions and performance insights by converting raw events into trusted, analytics-ready data for monitoring and diagnostics.
+v1beta:
+  data:
+    meta:
+      title: Transactions
+    collaborators:
+      - name: yogeshkhangode
+        description: owner
+      - name: kishanmahajan
+        description: developer
+    resource:
+      refType: dataos
+      ref: bundle:v1beta:transactions-bundle
+    inputs:
+      - refType: depot
+        ref: dataos://bigquery:data_market_place/transactions
+    outputs:
+      - refType: dataos
+        ref: dataset:icebase:data_market_place:transactions

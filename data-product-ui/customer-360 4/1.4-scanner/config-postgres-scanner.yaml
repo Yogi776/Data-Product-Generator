@@ -1,0 +1,32 @@
+version: v1
+name: wf-postgres-scanner
+type: workflow
+tags:
+- Tier.Gold
+description: Scan schema from postgres and register in Metis.
+owner: dataos-manager
+workspace: public
+workflow:
+  dag:
+  - name: postgres-scanner
+    description: Scan schema and register in Metis.
+    spec:
+      tags:
+      - scanner
+      stack: scanner:2.0
+      runAsUser: metis
+      compute: runnable-default
+      resources:
+        requests:
+          cpu: 200m
+          memory: 250Mi
+        limits:
+          cpu: '1'
+          memory: 1000Mi
+      stackSpec:
+        depot: dataos://postgres
+        sourceConfig:
+          config:
+            schemaFilterPattern:
+              includes:
+              - public

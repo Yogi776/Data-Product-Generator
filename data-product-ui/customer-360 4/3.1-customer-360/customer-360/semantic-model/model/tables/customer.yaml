@@ -1,0 +1,19 @@
+tables:
+  - name: customer
+    sql: {{ load_sql('customer') }}
+    description: Comprehensive customer data for analytics and reporting
+    data_source: icebase
+    public: true
+
+    dimensions:
+      - name: customer_id
+        description: "Primary business identifier for customer"
+        type: string
+        sql: customer_id
+        primary_key: true
+
+    measures:
+      - name: total_customer
+        sql: customer_id
+        type: count
+        description: "Total count of customer records"

@@ -1,0 +1,42 @@
+name: minervac
+version: v1
+type: cluster
+tags:
+  - cluster
+  - minerva
+  - dataos:type:resource
+  - dataos:resource:cluster
+  - dataos:layer:system
+  - dataos:workspace:system
+description: the default minerva cluster
+owner: dataos-manager
+workspace: system
+cluster:
+  compute: query-default
+  type: minerva
+  minerva:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    depots:
+      - address: dataos://icebase:default
+        properties:
+          iceberg.file-format: PARQUET
+          iceberg.compression-codec: GZIP
+          hive.config.resources: "/usr/trino/etc/catalog/core-site.xml"
+      - address: dataos://gateway:default
+      - address: dataos://metisdb:default
+      - address: dataos://depotservice:default
+      - address: dataos://postgres:default
+    coordinatorEnvs:
+      "JVM__opts": "--add-opens=java.base/java.nio=ALL-UNNAMED"
+    workerEnvs:
+      "JVM__opts": "--add-opens=java.base/java.nio=ALL-UNNAMED"
+    debug:
+      logLevel: ERROR
+      trinoLogLevel: ERROR

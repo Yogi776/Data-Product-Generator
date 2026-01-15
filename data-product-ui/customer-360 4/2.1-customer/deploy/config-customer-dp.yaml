@@ -1,0 +1,29 @@
+name: customer-dp
+version: v1beta
+type: data
+description: |
+  customer delivers structured, time-stamped event data that reveals key operational signals, enabling observability and data-driven optimization.
+tags:
+  - DPUsecase.customer_360
+  - DPTier.Source Aligned
+  - DPDomain.customer_360
+purpose: |
+  Enables faster decisions and performance insights by converting raw events into trusted, analytics-ready data for monitoring and diagnostics.
+v1beta:
+  data:
+    meta:
+      title: Customer
+    collaborators:
+      - name: owner
+        description: owner
+      - name: developer
+        description: developer
+    resource:
+      refType: dataos
+      ref: bundle:v1beta:customer-bundle
+    inputs:
+      - refType: depot
+        ref: dataos://snowflake:customer_360/customer
+    outputs:
+      - refType: dataos
+        ref: dataset:postgres:customer_360:customer

@@ -1,0 +1,39 @@
+name: credit-debit-ratio-api
+version: v1
+type: service
+tags:
+  - dataos:talos-service
+  - Domain.Customer Market Place
+description: This is a Talos service designed to solve business challenges by providing a custom API solution for customer market place data.
+workspace: public
+service:
+  servicePort: 3000
+  ingress:
+    enabled: true
+    stripPath: true
+    path: /talos/public:credit-debit-ratio-api
+    noAuthentication: false
+  replicas: 1
+  logLevel: DEBUG
+  compute: runnable-default
+  envs:    
+    TALOS_SCHEMA_PATH: npa-early-warning-system/customer-market-place/3.1-customer-market-place/activation/data-apis/lens-talos
+    TALOS_BASE_PATH: /talos/public:credit-debit-ratio-api
+  resources: 
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  stack: talos:2.0
+  dataosSecrets:
+    - name: sales360
+      allKeys: true
+  stackSpec:
+    repo:
+      url: https://bitbucket.org/rubik_/npa-early-warning-system/
+      projectDirectory: npa-early-warning-system/customer-market-place/3.1-customer-market-place/activation/data-apis/lens-talos
+      syncFlags:   
+        - --ref=main
+ 

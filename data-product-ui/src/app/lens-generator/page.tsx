@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import JSZip from 'jszip';
 import { ToastContainer, ToastType, ToastData } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -42,6 +42,16 @@ interface LensConfig {
   tables: Table[];
 }
 
+interface SavedSQL {
+  id: string;
+  name: string;
+  sql: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export default function LensGenerator() {
   const [config, setConfig] = useState<LensConfig>({
     project_name: '',
@@ -55,6 +65,17 @@ export default function LensGenerator() {
   const [isParsing, setIsParsing] = useState(false);
   const [sqlInput, setSqlInput] = useState('');
   const [showSqlParser, setShowSqlParser] = useState(false);
+
+  // SQL Library state
+  const [savedSQLs, setSavedSQLs] = useState<SavedSQL[]>([]);
+  const [showSQLLibrary, setShowSQLLibrary] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveDialogData, setSaveDialogData] = useState({ name: '', description: '', tags: '' });
+
+  // AI Generation state
+  const [aiGenerating, setAiGenerating] = useState<{ [key: string]: boolean }>({});
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestedMeasures, setAiSuggestedMeasures] = useState<Measure[]>([]);
 
   // Toast notification state
   const [toasts, setToasts] = useState<ToastData[]>([]);
@@ -108,9 +129,119 @@ export default function LensGenerator() {
     });
   }, []);
 
+  // SQL Library LocalStorage functions
+  const STORAGE_KEY = 'lens-generator-saved-sqls';
+
+  const loadSavedSQLs = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert date strings back to Date objects
+        const sqls = parsed.map((sql: SavedSQL) => ({
+          ...sql,
+          createdAt: new Date(sql.createdAt),
+          updatedAt: new Date(sql.updatedAt)
+        }));
+        setSavedSQLs(sqls);
+      }
+    } catch (error) {
+      console.error('Error loading saved SQLs:', error);
+      showError('Failed to load saved SQL queries', 'LocalStorage may be disabled');
+    }
+  }, [showError]);
+
+  const saveSQLsToStorage = useCallback((sqls: SavedSQL[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sqls));
+    } catch (error) {
+      console.error('Error saving SQLs:', error);
+      showError('Failed to save SQL query', 'LocalStorage may be full or disabled');
+    }
+  }, [showError]);
+
+  // Load saved SQLs on mount
+  useEffect(() => {
+    loadSavedSQLs();
+  }, [loadSavedSQLs]);
+
   const closeConfirmation = useCallback(() => {
     setConfirmDialog(prev => ({ ...prev, isOpen: false }));
   }, []);
+
+  // SQL Library CRUD functions
+  const handleSaveSQL = useCallback(() => {
+    if (!sqlInput.trim()) {
+      showError('Cannot save empty SQL', 'Please enter a SQL query first');
+      return;
+    }
+    setSaveDialogData({ name: '', description: '', tags: '' });
+    setShowSaveDialog(true);
+  }, [sqlInput, showError]);
+
+  const confirmSaveSQL = useCallback(() => {
+    if (!saveDialogData.name.trim()) {
+      showError('Name is required', 'Please enter a name for this SQL query');
+      return;
+    }
+
+    const newSQL: SavedSQL = {
+      id: `sql-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: saveDialogData.name.trim(),
+      sql: sqlInput.trim(),
+      description: saveDialogData.description.trim() || undefined,
+      tags: saveDialogData.tags.trim() ? saveDialogData.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const updatedSQLs = [...savedSQLs, newSQL];
+    setSavedSQLs(updatedSQLs);
+    saveSQLsToStorage(updatedSQLs);
+    setShowSaveDialog(false);
+    setSaveDialogData({ name: '', description: '', tags: '' });
+    showSuccess('SQL saved successfully!', `"${newSQL.name}" has been added to your library`);
+  }, [saveDialogData, sqlInput, savedSQLs, saveSQLsToStorage, showError, showSuccess]);
+
+  const loadSavedSQL = useCallback((savedSQL: SavedSQL) => {
+    setSqlInput(savedSQL.sql);
+    setShowSQLLibrary(false);
+    showInfo('SQL loaded', `"${savedSQL.name}" has been loaded into the editor`);
+  }, [showInfo]);
+
+  const deleteSavedSQL = useCallback((id: string) => {
+    const sql = savedSQLs.find(s => s.id === id);
+    if (!sql) return;
+
+    showConfirmation(
+      'Delete Saved SQL',
+      `Are you sure you want to delete "${sql.name}"? This action cannot be undone.`,
+      () => {
+        const updatedSQLs = savedSQLs.filter(s => s.id !== id);
+        setSavedSQLs(updatedSQLs);
+        saveSQLsToStorage(updatedSQLs);
+        showSuccess('SQL deleted', `"${sql.name}" has been removed from your library`);
+      }
+    );
+  }, [savedSQLs, saveSQLsToStorage, showConfirmation, showSuccess]);
+
+  const clearAllSQLs = useCallback(() => {
+    if (savedSQLs.length === 0) {
+      showInfo('Library is empty', 'There are no saved SQL queries to clear');
+      return;
+    }
+
+    showConfirmation(
+      'Clear All Saved SQLs',
+      `Are you sure you want to delete all ${savedSQLs.length} saved SQL queries? This action cannot be undone.`,
+      () => {
+        setSavedSQLs([]);
+        saveSQLsToStorage([]);
+        showSuccess('Library cleared', 'All saved SQL queries have been removed');
+        setShowSQLLibrary(false);
+      }
+    );
+  }, [savedSQLs, saveSQLsToStorage, showConfirmation, showSuccess, showInfo]);
 
   // Validation functions
   const validateProjectName = useCallback((name: string): { valid: boolean; error?: string } => {
@@ -335,13 +466,12 @@ export default function LensGenerator() {
       columnLines.forEach((line) => {
         if (!line || line === '*') return;
         
-        let originalLine = line;
         // Remove quotes
         line = line.replace(/["'`]/g, '');
         
         // Handle CAST operations: CAST(col AS type) or col::type
-        let castMatch = line.match(/CAST\s*\(\s*(.+?)\s+AS\s+(\w+)\s*\)/i);
-        let pgCastMatch = line.match(/(.+?)::([\w\s()]+)(?:\s+(?:as\s+)?(\w+))?$/i);
+        const castMatch = line.match(/CAST\s*\(\s*(.+?)\s+AS\s+(\w+)\s*\)/i);
+        const pgCastMatch = line.match(/(.+?)::([\w\s()]+)(?:\s+(?:as\s+)?(\w+))?$/i);
         
         let sqlExpression = '';
         let columnName = '';
@@ -694,6 +824,173 @@ export default function LensGenerator() {
       )
     }));
   };
+
+  // AI Generation functions
+  const generateMeasureDescription = useCallback(async (tableIndex: number, measureIndex: number) => {
+    const table = config.tables[tableIndex];
+    const measure = table.measures[measureIndex];
+    
+    if (!measure.name || !measure.sql) {
+      showError('Cannot generate description', 'Please provide measure name and SQL first');
+      return;
+    }
+
+    const key = `desc-${tableIndex}-${measureIndex}`;
+    setAiGenerating(prev => ({ ...prev, [key]: true }));
+
+    try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/ai/generate-measure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate-description',
+          data: {
+            measureName: measure.name,
+            measureType: measure.type,
+            measureSql: measure.sql,
+            tableName: table.name,
+            tableDescription: table.description,
+            dimensions: table.dimensions.map(d => ({
+              name: d.name,
+              type: d.type,
+              description: d.description
+            }))
+          }
+        })
+      });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        throw new Error('API returned invalid response. Check console for details. Make sure .env.local has OPENAI_API_KEY and restart server.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || result.details || 'Failed to generate description');
+      }
+
+      if (!result.description) {
+        throw new Error('No description returned from AI');
+      }
+      
+      // Update measure description
+      updateMeasure(tableIndex, measureIndex, 'description', result.description);
+      showSuccess('Description generated!', 'AI has created a professional description for this measure');
+
+    } catch (error) {
+      console.error('AI generation error:', error);
+      showError(
+        'Failed to generate description',
+        error instanceof Error ? error.message : 'Please check your OpenAI API key in .env.local and restart server'
+      );
+    } finally {
+      setAiGenerating(prev => ({ ...prev, [key]: false }));
+    }
+  }, [config.tables, showError, showSuccess]);
+
+  const suggestMeasures = useCallback(async (tableIndex: number) => {
+    const table = config.tables[tableIndex];
+    
+    if (table.dimensions.length === 0) {
+      showError('Cannot suggest measures', 'Please add dimensions to the table first');
+      return;
+    }
+
+    const key = `suggest-${tableIndex}`;
+    setAiGenerating(prev => ({ ...prev, [key]: true }));
+
+    try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/ai/generate-measure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'suggest-measures',
+          data: {
+            tableName: table.name,
+            tableDescription: table.description,
+            dimensions: table.dimensions.map(d => ({
+              name: d.name,
+              type: d.type,
+              description: d.description
+            })),
+            existingMeasures: table.measures.map(m => ({
+              name: m.name,
+              type: m.type
+            }))
+          }
+        })
+      });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        throw new Error('API returned invalid response. Check console for details. Make sure .env.local has OPENAI_API_KEY and restart server.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || result.details || 'Failed to suggest measures');
+      }
+
+      if (!result.measures || !Array.isArray(result.measures)) {
+        throw new Error('Invalid response format from AI');
+      }
+
+      setAiSuggestedMeasures(result.measures);
+      setShowAISuggestions(true);
+      showSuccess('Measures suggested!', `AI has suggested ${result.measures.length} intelligent measures based on your dimensions`);
+
+    } catch (error) {
+      console.error('AI suggestion error:', error);
+      showError(
+        'Failed to suggest measures',
+        error instanceof Error ? error.message : 'Please check your OpenAI API key in .env.local and restart server'
+      );
+    } finally {
+      setAiGenerating(prev => ({ ...prev, [key]: false }));
+    }
+  }, [config.tables, showError, showSuccess]);
+
+  const addSuggestedMeasure = useCallback((measure: Measure, tableIndex: number) => {
+    setConfig(prev => ({
+      ...prev,
+      tables: prev.tables.map((table, i) =>
+        i === tableIndex
+          ? {
+              ...table,
+              measures: [...table.measures, measure]
+            }
+          : table
+      )
+    }));
+    showInfo('Measure added', `"${measure.name}" has been added to your table`);
+  }, [showInfo]);
+
+  const addAllSuggestedMeasures = useCallback((tableIndex: number) => {
+    setConfig(prev => ({
+      ...prev,
+      tables: prev.tables.map((table, i) =>
+        i === tableIndex
+          ? {
+              ...table,
+              measures: [...table.measures, ...aiSuggestedMeasures]
+            }
+          : table
+      )
+    }));
+    setShowAISuggestions(false);
+    setAiSuggestedMeasures([]);
+    showSuccess('All measures added!', `Added ${aiSuggestedMeasures.length} measures to your table`);
+  }, [aiSuggestedMeasures, showSuccess]);
 
   // Delete measure
   const deleteMeasure = (tableIndex: number, measureIndex: number) => {
@@ -1109,12 +1406,23 @@ lens:
                 🚀 Quick Add from SQL
               </h2>
             </div>
-            <button
-              onClick={() => setShowSqlParser(!showSqlParser)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-            >
-              {showSqlParser ? 'Hide' : 'Show SQL Parser'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSQLLibrary(!showSQLLibrary)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                </svg>
+                SQL Library ({savedSQLs.length})
+              </button>
+              <button
+                onClick={() => setShowSqlParser(!showSqlParser)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+              >
+                {showSqlParser ? 'Hide' : 'Show SQL Parser'}
+              </button>
+            </div>
           </div>
           
           {showSqlParser && (
@@ -1146,6 +1454,17 @@ lens:
                   ) : (
                     '✨ Parse SQL & Generate Table'
                   )}
+                </button>
+                <button
+                  onClick={handleSaveSQL}
+                  disabled={!sqlInput.trim()}
+                  className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title="Save this SQL to library"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                  </svg>
+                  Save
                 </button>
                 <button
                   onClick={() => setSqlInput('')}
@@ -1489,12 +1808,37 @@ lens:
                       <p className="text-sm text-gray-600">
                         Define aggregations and metrics
                       </p>
-                      <button
-                        onClick={() => addMeasure(selectedTable)}
-                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-                      >
-                        + Add Measure
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => suggestMeasures(selectedTable)}
+                          disabled={aiGenerating[`suggest-${selectedTable}`] || config.tables[selectedTable].dimensions.length === 0}
+                          className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all text-sm font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                          title="AI will suggest intelligent measures based on your dimensions"
+                        >
+                          {aiGenerating[`suggest-${selectedTable}`] ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                              </svg>
+                              ✨ AI Suggest
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => addMeasure(selectedTable)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                        >
+                          + Add Measure
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-4">
@@ -1533,24 +1877,82 @@ lens:
                               </button>
                             </div>
                           </div>
-                          <input
-                            type="text"
-                            value={measure.description}
-                            onChange={(e) =>
-                              updateMeasure(selectedTable, measureIndex, 'description', e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 mb-2"
-                            placeholder="Description"
-                          />
-                          <input
-                            type="text"
-                            value={measure.sql}
-                            onChange={(e) =>
-                              updateMeasure(selectedTable, measureIndex, 'sql', e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm"
-                            placeholder="SQL expression (e.g., sales_amount)"
-                          />
+                          <div className="relative mb-2">
+                            <input
+                              type="text"
+                              value={measure.description}
+                              onChange={(e) =>
+                                updateMeasure(selectedTable, measureIndex, 'description', e.target.value)
+                              }
+                              className="w-full px-3 py-2 pr-24 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                              placeholder="Description"
+                            />
+                            <button
+                              onClick={() => generateMeasureDescription(selectedTable, measureIndex)}
+                              disabled={!measure.name || !measure.sql || aiGenerating[`desc-${selectedTable}-${measureIndex}`]}
+                              className="absolute right-1 top-1 px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded hover:from-purple-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              title="Generate AI description"
+                            >
+                              {aiGenerating[`desc-${selectedTable}-${measureIndex}`] ? (
+                                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              ) : (
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                                </svg>
+                              )}
+                              {aiGenerating[`desc-${selectedTable}-${measureIndex}`] ? 'AI...' : '✨ AI'}
+                            </button>
+                          </div>
+                          
+                          {/* Dimension Selector & SQL Input */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                                Quick Select Column:
+                              </label>
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    updateMeasure(selectedTable, measureIndex, 'sql', e.target.value);
+                                  }
+                                }}
+                                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                value=""
+                              >
+                                <option value="">-- Select a dimension column --</option>
+                                {config.tables[selectedTable].dimensions.map((dim, idx) => (
+                                  <option key={idx} value={dim.sql || dim.name}>
+                                    {dim.name} {dim.primary_key ? '🔑' : ''} ({dim.type})
+                                  </option>
+                                ))}
+                                <option value="*">* (all columns)</option>
+                              </select>
+                            </div>
+                            
+                            <div className="relative">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                SQL Expression (Manual Override):
+                              </label>
+                              <input
+                                type="text"
+                                value={measure.sql}
+                                onChange={(e) =>
+                                  updateMeasure(selectedTable, measureIndex, 'sql', e.target.value)
+                                }
+                                className="w-full px-3 py-2 border-2 border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm"
+                                placeholder="e.g., sales_amount or * for COUNT(*)"
+                              />
+                              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                Use dropdown above for quick selection, or type custom SQL expression here
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       ))}
 
@@ -1818,6 +2220,328 @@ lens:
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirmation}
       />
+
+      {/* SQL Library Modal */}
+      {showSQLLibrary && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowSQLLibrary(false)} />
+          
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden animate-fade-in">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                  </svg>
+                  <h2 className="text-2xl font-bold text-white">SQL Query Library</h2>
+                  <span className="bg-white bg-opacity-20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                    {savedSQLs.length} {savedSQLs.length === 1 ? 'query' : 'queries'}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {savedSQLs.length > 0 && (
+                    <button
+                      onClick={clearAllSQLs}
+                      className="px-3 py-1 bg-red-500 bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors text-sm font-medium"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowSQLLibrary(false)}
+                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
+                {savedSQLs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-24 w-24 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No saved queries yet</h3>
+                    <p className="text-gray-500 mb-4">Save your SQL queries to reuse them later</p>
+                    <button
+                      onClick={() => setShowSQLLibrary(false)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      Start Writing SQL
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {savedSQLs.map((savedSQL) => (
+                      <div
+                        key={savedSQL.id}
+                        className="border-2 border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">{savedSQL.name}</h3>
+                            {savedSQL.description && (
+                              <p className="text-sm text-gray-600 mb-2">{savedSQL.description}</p>
+                            )}
+                            {savedSQL.tags && savedSQL.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {savedSQL.tags.map((tag, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-400">
+                              Created: {savedSQL.createdAt.toLocaleDateString()} {savedSQL.createdAt.toLocaleTimeString()}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => loadSavedSQL(savedSQL)}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-1"
+                              title="Load this SQL"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Load
+                            </button>
+                            <button
+                              onClick={() => deleteSavedSQL(savedSQL.id)}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                              title="Delete this SQL"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 mt-3">
+                          <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                            {savedSQL.sql}
+                          </pre>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Suggestions Modal */}
+      {showAISuggestions && selectedTable !== null && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowAISuggestions(false)} />
+          
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden animate-fade-in">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-7 h-7 text-white animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                  </svg>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">AI-Suggested Measures</h2>
+                    <p className="text-sm text-purple-100">Intelligent measures generated from your table dimensions</p>
+                  </div>
+                  <span className="bg-white bg-opacity-20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                    {aiSuggestedMeasures.length} suggestions
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => addAllSuggestedMeasures(selectedTable)}
+                    className="px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors text-sm font-medium"
+                  >
+                    ✨ Add All
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAISuggestions(false);
+                      setAiSuggestedMeasures([]);
+                    }}
+                    className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+                <div className="grid gap-4">
+                  {aiSuggestedMeasures.map((measure, idx) => (
+                    <div
+                      key={idx}
+                      className="border-2 border-purple-200 rounded-lg p-5 hover:border-purple-400 hover:shadow-lg transition-all bg-gradient-to-r from-purple-50 to-pink-50"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-bold text-gray-900">{measure.name}</h3>
+                            <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded text-xs font-semibold uppercase">
+                              {measure.type}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-3 leading-relaxed">
+                            {measure.description}
+                          </p>
+                          <div className="bg-white rounded-lg p-3 border border-purple-200">
+                            <p className="text-xs font-medium text-gray-600 mb-1">SQL Expression:</p>
+                            <code className="text-sm font-mono text-purple-700">{measure.sql}</code>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            addSuggestedMeasure(measure, selectedTable);
+                            setAiSuggestedMeasures(prev => prev.filter((_, i) => i !== idx));
+                            if (aiSuggestedMeasures.length === 1) {
+                              setShowAISuggestions(false);
+                            }
+                          }}
+                          className="ml-4 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md font-medium flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                          </svg>
+                          Add This
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {aiSuggestedMeasures.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🎉</div>
+                    <h3 className="text-xl font-semibold text-gray-700">All suggestions added!</h3>
+                    <p className="text-gray-500 mt-2">You&apos;ve added all AI-suggested measures to your table</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Tip */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-3 border-t border-purple-200">
+                <p className="text-xs text-purple-800 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <strong>Pro Tip:</strong> AI analyzes your dimensions to suggest relevant business metrics. You can edit them after adding.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save SQL Dialog */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowSaveDialog(false)} />
+          
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full animate-fade-in">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 rounded-t-xl">
+                <h2 className="text-xl font-bold text-white">Save SQL Query</h2>
+              </div>
+
+              {/* Form */}
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Query Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={saveDialogData.name}
+                    onChange={(e) => setSaveDialogData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., Battery Data Query"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (optional)
+                  </label>
+                  <textarea
+                    value={saveDialogData.description}
+                    onChange={(e) => setSaveDialogData(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Brief description of what this query does..."
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tags (optional, comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={saveDialogData.tags}
+                    onChange={(e) => setSaveDialogData(prev => ({ ...prev, tags: e.target.value }))}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., battery, telemetry, icebase"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Separate tags with commas</p>
+                </div>
+
+                {/* Preview */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">SQL Preview</label>
+                  <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                    <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words">
+                      {sqlInput}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="bg-gray-50 px-6 py-4 rounded-b-xl flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowSaveDialog(false);
+                    setSaveDialogData({ name: '', description: '', tags: '' });
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSaveSQL}
+                  disabled={!saveDialogData.name.trim()}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                  </svg>
+                  Save Query
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

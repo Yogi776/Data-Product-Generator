@@ -1,0 +1,11 @@
+name: customer-360
+description: A talos app for customer-360 API
+version: 0.0.1
+logLevel: DEBUG
+auth:
+    heimdallUrl: https://example.com/heimdall
+cachePath: /tmp    
+sources:
+    - name: customer-360
+      type: lens
+      lensName: 'public:customer-360'

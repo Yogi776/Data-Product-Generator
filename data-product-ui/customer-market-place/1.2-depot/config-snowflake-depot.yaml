@@ -1,0 +1,26 @@
+name: snowflake
+version: v2alpha
+type: depot
+tags:
+  - Tier.Gold
+layer: user
+depot:
+  name: snowflake
+  type: snowflake
+  description: The purpose of depot to connect to snowflake.
+  secrets:
+    - name: snowflake-r
+      keys:
+        - snowflake-r
+      allKeys: true
+    - name: snowflake-rw
+      keys:
+        - snowflake-rw
+      allKeys: true
+  external: true
+  snowflake:
+    database: SOLUTION
+    url: EQZOTUQ-JCA67320.snowflakecomputing.com
+    warehouse: COMPUTE_WH
+    account: EQZOTUQ-JCA67320
+  source: snowflake

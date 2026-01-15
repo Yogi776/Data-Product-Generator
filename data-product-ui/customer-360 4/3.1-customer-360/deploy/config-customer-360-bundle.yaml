@@ -1,0 +1,15 @@
+name: customer-360-bundle
+version: v1beta
+type: bundle
+tags:
+  - Tier.Gold
+description: Bundle for customer-360 consumer data product.
+layer: "user"
+bundle:
+  resources:
+    - id: customer-360-dp
+      file: customer-360/3.1-customer-360/deploy/config-customer-360-dp.yaml
+      workspace: public
+    - id: customer-360-lens
+      file: customer-360/3.1-customer-360/customer-360/semantic-model/deployment.yaml
+      workspace: public

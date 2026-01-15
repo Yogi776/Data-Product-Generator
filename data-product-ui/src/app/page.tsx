@@ -1,152 +1,564 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import JSZip from 'jszip';
 import { generateYamlFiles } from '@/utils/yamlGenerator';
+import { SourceType } from '@/types/dataProduct';
+
+type TextRow = { id: string; value: string };
+type SourceRow = TextRow & { sourceType: SourceType };
+type DepotRow = { id: string; name: string; type: string };
+type ScannerRow = { id: string; name: string; depot: string; includePattern: string };
 
 interface ProjectConfig {
   projectName: string;
-  dataProductEntities: string[];
+  clusterName: string;
+  depots: DepotRow[];
+  scanners: ScannerRow[];
+  dataProductEntities: SourceRow[];
   consumptionLayer: string;
   useCustomSemanticEntities: boolean;
+  semanticEntities: TextRow[];
+}
+
+type PreviewData = {
+  projectName: string;
+  dataProducts: Array<{
+    name: string;
+    entity: string;
+    type: 'source';
+    createdAt: Date;
+  }>;
+  consumptionLayer: {
+    name: string;
+    entities: string[];
+    type: 'consumer';
+  };
+};
+
+const steps = [
+  { title: 'Business use case', helper: 'Name your project' },
+  { title: 'Infra setup', helper: 'Define instance-secret, depot, cluster, scanner' },
+  { title: 'Source datasets', helper: 'List the source-aligned data products' },
+  { title: 'Consumption layer', helper: 'Name of semantic model' },
+  { title: 'Review & export', helper: 'Preview the data product' },
+];
+
+type SourceFormProps = {
+  items: SourceRow[];
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onChangeName: (index: number, value: string) => void;
+  onChangeSourceType: (index: number, type: SourceType) => void;
+};
+
+type SemanticFormProps = {
+  items: TextRow[];
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onChange: (index: number, value: string) => void;
+  useCustomSemanticEntities: boolean;
+  onToggleCustom: (checked: boolean) => void;
+};
+
+type ReviewCardProps = {
+  projectName: string;
+  sources: string[];
   semanticEntities: string[];
+  consumptionLayer: string;
+  clusterName: string;
+  secretType: string;
+  depots: DepotRow[];
+  scanners: ScannerRow[];
+};
+
+function StatBadge({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-gray-200 rounded-lg px-4 py-3 bg-white shadow-sm">
+      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="text-sm font-semibold text-gray-900 truncate">{value || '—'}</div>
+    </div>
+  );
+}
+
+function StepHeader({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-3">
+        {steps.map((step, idx) => {
+          const active = idx === currentStep;
+          const done = idx < currentStep;
+          return (
+            <div key={step.title} className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                  active
+                    ? 'bg-blue-600 text-white'
+                    : done
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {done ? '✓' : idx + 1}
+              </div>
+              <div className="hidden sm:block">
+                <div className="text-sm font-medium text-gray-900">{step.title}</div>
+                <div className="text-xs text-gray-500">{step.helper}</div>
+              </div>
+              {idx < steps.length - 1 && <div className="w-6 border-t border-dashed border-gray-300" />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SourcesForm({ items, onAdd, onRemove, onChangeName, onChangeSourceType }: SourceFormProps) {
+  return (
+    <div className="space-y-3">
+      {items.map((entity, index) => (
+        <div key={entity.id} className="flex flex-col gap-2 md:flex-row">
+          <div className="flex-1 flex gap-2">
+            <input
+              type="text"
+              value={entity.value}
+              onChange={(e) => onChangeName(index, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., customers"
+            />
+            <select
+              value={entity.sourceType}
+              onChange={(e) => onChangeSourceType(index, e.target.value as SourceType)}
+              className="w-40 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="snowflake">Snowflake</option>
+              <option value="postgres">Postgres</option>
+              <option value="s3">S3</option>
+              <option value="bigquery">BigQuery</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+            disabled={items.length === 1}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+      >
+        + Add source-aligned data product
+      </button>
+      <p className="text-xs text-gray-500">
+        Tip: add each table or topic you want to generate configs for. Names should be slug-friendly (letters, numbers, hyphens).
+      </p>
+    </div>
+  );
+}
+
+function SemanticForm({ items, onAdd, onRemove, onChange, useCustomSemanticEntities, onToggleCustom }: SemanticFormProps) {
+  return (
+    <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          checked={useCustomSemanticEntities}
+          onChange={(e) => onToggleCustom(e.target.checked)}
+          className="rounded"
+        />
+        Use custom semantic entities
+      </label>
+      {useCustomSemanticEntities && (
+        <>
+          {items.map((entity, index) => (
+            <div key={entity.id} className="flex gap-2">
+              <input
+                type="text"
+                value={entity.value}
+                onChange={(e) => onChange(index, e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., orders_agg"
+              />
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                disabled={items.length === 1}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            + Add semantic entity
+          </button>
+        </>
+      )}
+      <p className="text-xs text-gray-500">
+        Leave unchecked to reuse your source entities for the semantic model.
+      </p>
+    </div>
+  );
+}
+
+function ReviewCard({
+  projectName,
+  sources,
+  semanticEntities,
+  consumptionLayer,
+  clusterName,
+  secretType,
+  depots,
+  scanners,
+}: ReviewCardProps) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatBadge label="Project" value={projectName || 'project'} />
+        <StatBadge label="Cluster" value={clusterName || '—'} />
+        <StatBadge label="Secret type" value={secretType || '—'} />
+        <StatBadge label="Consumer" value={consumptionLayer || 'consumer'} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Sources</div>
+              <p className="text-xs text-gray-500">Source-aligned data products</p>
+            </div>
+            <span className="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-full">{sources.length}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sources.length > 0 ? (
+              sources.map((e) => (
+                <span key={e} className="px-2 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
+                  {e}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No sources added.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Semantic entities</div>
+              <p className="text-xs text-gray-500">Used by the consumption layer</p>
+            </div>
+            <span className="px-2 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-full">
+              {semanticEntities.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {semanticEntities.length > 0 ? (
+              semanticEntities.map((e) => (
+                <span key={e} className="px-2 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
+                  {e}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">Semantic entities will mirror sources.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Depots</div>
+              <p className="text-xs text-gray-500">Connection details</p>
+            </div>
+            <span className="px-2 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-full">
+              {depots.length}
+            </span>
+          </div>
+          <ul className="divide-y divide-gray-200">
+            {depots.map((d) => (
+              <li key={d.id} className="py-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-gray-900">{d.name || 'Depot'}</div>
+                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 uppercase">{d.type || '—'}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Scanners</div>
+              <p className="text-xs text-gray-500">Schema discovery per depot</p>
+            </div>
+            <span className="px-2 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-full">
+              {scanners.length}
+            </span>
+          </div>
+          <ul className="divide-y divide-gray-200">
+            {scanners.map((s) => (
+              <li key={s.id} className="py-2 space-y-1">
+                <div className="text-sm font-semibold text-gray-900">{s.name || 'Scanner'}</div>
+                <div className="text-xs text-gray-600">Depot: {s.depot || '—'}</div>
+                <div className="text-xs text-gray-600">
+                  Include: {s.includePattern ? <span className="font-mono">{s.includePattern}</span> : '—'}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
-  const [config, setConfig] = useState<ProjectConfig>({
-    projectName: '',
-    dataProductEntities: [],
-    consumptionLayer: '',
-    useCustomSemanticEntities: false,
-    semanticEntities: []
+  const newSourceRow = (): SourceRow => ({
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
+    value: '',
+    sourceType: 'snowflake',
   });
 
-  const [previewData, setPreviewData] = useState<{
-    projectName: string;
-    dataProducts: Array<{
-      name: string;
-      entity: string;
-      type: 'source';
-      createdAt: Date;
-    }>;
-    consumptionLayer: {
-      name: string;
-      entities: string[];
-      type: 'consumer';
-    };
-  } | null>(null);
+  const newSemanticRow = (): TextRow => ({
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
+    value: '',
+  });
+
+  const newDepotRow = (): DepotRow => ({
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
+    name: '',
+    type: 'bigquery',
+  });
+
+  const newScannerRow = (depot: string = ''): ScannerRow => ({
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
+    name: '',
+    depot,
+    includePattern: '',
+  });
+
+  const [config, setConfig] = useState<ProjectConfig>({
+    projectName: '',
+    clusterName: '',
+    depots: [newDepotRow()],
+    scanners: [newScannerRow()],
+    dataProductEntities: [newSourceRow()],
+    consumptionLayer: '',
+    useCustomSemanticEntities: false,
+    semanticEntities: [newSemanticRow()],
+  });
+
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationResult, setGenerationResult] = useState<string>('');
-  const [showDetails, setShowDetails] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
-  const addDataProductEntity = () => {
-    setConfig(prev => ({
+  const normalizeSourceType = (value?: string): SourceType => {
+    const lowered = (value || '').toLowerCase();
+    if (lowered === 'snowflake' || lowered === 'postgres' || lowered === 's3' || lowered === 'bigquery' || lowered === 'other') {
+      return lowered;
+    }
+    return 'other';
+  };
+
+  const validEntities = useMemo(() => config.dataProductEntities.map((e) => e.value.trim()).filter(Boolean), [config.dataProductEntities]);
+
+  const validSemanticEntities = useMemo(() => {
+    if (!config.useCustomSemanticEntities) return validEntities;
+    return config.semanticEntities.map((e) => e.value.trim()).filter(Boolean);
+  }, [config.semanticEntities, config.useCustomSemanticEntities, validEntities]);
+
+  const canContinue = useMemo(() => {
+    if (currentStep === 0) return config.projectName.trim().length > 0;
+    if (currentStep === 1) {
+      const depotsOk =
+        config.depots.length > 0 &&
+        config.depots.every((d) => d.name.trim().length > 0 && d.type.trim().length > 0);
+      const scannersOk =
+        config.scanners.length > 0 &&
+        config.scanners.every((s) => s.name.trim().length > 0 && s.depot.trim().length > 0);
+      return config.clusterName.trim().length > 0 && depotsOk && scannersOk;
+    }
+    if (currentStep === 2) return validEntities.length > 0;
+    if (currentStep === 3) return config.consumptionLayer.trim().length > 0;
+    return true;
+  }, [config.clusterName, config.consumptionLayer, config.depots, config.projectName, config.scanners, currentStep, validEntities.length]);
+
+  const addSourceRow = () => {
+    setConfig((prev) => ({ ...prev, dataProductEntities: [...prev.dataProductEntities, newSourceRow()] }));
+  };
+
+  const addSemanticRow = () => {
+    setConfig((prev) => ({ ...prev, semanticEntities: [...prev.semanticEntities, newSemanticRow()] }));
+  };
+
+  const removeSourceRow = (index: number) => {
+    setConfig((prev) => {
+      if (prev.dataProductEntities.length === 1) return prev;
+      return { ...prev, dataProductEntities: prev.dataProductEntities.filter((_, i) => i !== index) };
+    });
+  };
+
+  const removeSemanticRow = (index: number) => {
+    setConfig((prev) => {
+      if (prev.semanticEntities.length === 1) return prev;
+      return { ...prev, semanticEntities: prev.semanticEntities.filter((_, i) => i !== index) };
+    });
+  };
+
+  const updateSourceRow = (index: number, patch: Partial<SourceRow>) => {
+    setConfig((prev) => ({
       ...prev,
-      dataProductEntities: [...prev.dataProductEntities, '']
+      dataProductEntities: prev.dataProductEntities.map((item, i) => (i === index ? { ...item, ...patch } : item)),
     }));
   };
 
-  const removeDataProductEntity = (index: number) => {
-    setConfig(prev => ({
+  const updateSemanticRow = (index: number, value: string) => {
+    setConfig((prev) => ({
       ...prev,
-      dataProductEntities: prev.dataProductEntities.filter((_, i) => i !== index)
+      semanticEntities: prev.semanticEntities.map((item, i) => (i === index ? { ...item, value } : item)),
     }));
   };
 
-  const updateDataProductEntity = (index: number, value: string) => {
-    setConfig(prev => ({
+  const addDepot = () => {
+    setConfig((prev) => ({ ...prev, depots: [...prev.depots, newDepotRow()] }));
+  };
+
+  const updateDepot = (index: number, patch: Partial<DepotRow>) => {
+    setConfig((prev) => ({
       ...prev,
-      dataProductEntities: prev.dataProductEntities.map((entity, i) => 
-        i === index ? value : entity
-      )
+      depots: prev.depots.map((d, i) => (i === index ? { ...d, ...patch } : d)),
     }));
   };
 
-  const addSemanticEntity = () => {
-    setConfig(prev => ({
+  const removeDepot = (index: number) => {
+    setConfig((prev) => {
+      if (prev.depots.length === 1) return prev;
+      const depots = prev.depots.filter((_, i) => i !== index);
+      // Also clean scanners referencing removed depot
+      const remainingDepotName = depots[0]?.name || '';
+      const scanners = prev.scanners.map((s) =>
+        index === -1 ? s : s.depot === prev.depots[index].name ? { ...s, depot: remainingDepotName } : s
+      );
+      return { ...prev, depots, scanners };
+    });
+  };
+
+  const addScanner = () => {
+    const defaultDepot = config.depots[0]?.name || '';
+    setConfig((prev) => ({ ...prev, scanners: [...prev.scanners, newScannerRow(defaultDepot)] }));
+  };
+
+  const updateScanner = (index: number, patch: Partial<ScannerRow>) => {
+    setConfig((prev) => ({
       ...prev,
-      semanticEntities: [...prev.semanticEntities, '']
+      scanners: prev.scanners.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     }));
   };
 
-  const removeSemanticEntity = (index: number) => {
-    setConfig(prev => ({
-      ...prev,
-      semanticEntities: prev.semanticEntities.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateSemanticEntity = (index: number, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      semanticEntities: prev.semanticEntities.map((entity, i) => 
-        i === index ? value : entity
-      )
-    }));
+  const removeScanner = (index: number) => {
+    setConfig((prev) => {
+      if (prev.scanners.length === 1) return prev;
+      return { ...prev, scanners: prev.scanners.filter((_, i) => i !== index) };
+    });
   };
 
   const generatePreview = () => {
-    const validEntities = config.dataProductEntities.filter(e => e.trim() !== '');
-    const validSemanticEntities = config.useCustomSemanticEntities 
-      ? config.semanticEntities.filter(e => e.trim() !== '')
-      : validEntities;
-
-    const preview = {
+    const preview: PreviewData = {
       projectName: config.projectName,
-      dataProducts: validEntities.map(entity => ({
+      dataProducts: validEntities.map((entity) => ({
         name: entity,
-        entity: entity,
+        entity,
         type: 'source' as const,
-        createdAt: new Date()
+        createdAt: new Date(),
       })),
       consumptionLayer: {
         name: config.consumptionLayer,
         entities: validSemanticEntities,
-        type: 'consumer' as const
-      }
+        type: 'consumer' as const,
+      },
     };
-
     setPreviewData(preview);
   };
 
   const generateProject = async () => {
     setIsGenerating(true);
     setGenerationResult('');
-
     try {
-      const validEntities = config.dataProductEntities.filter(e => e.trim() !== '');
-      const validSemanticEntities = config.useCustomSemanticEntities 
-        ? config.semanticEntities.filter(e => e.trim() !== '')
-        : validEntities;
-
-      // Generate source-aligned data products
-      const sourceProducts = validEntities.map(entity => ({
+      const sourceProducts = validEntities.map((entity) => ({
         name: config.projectName,
-        entity: entity,
+        entity,
         type: 'source' as const,
-        createdAt: new Date()
+        createdAt: new Date(),
+        sourceTypes: [
+          normalizeSourceType(
+            config.dataProductEntities.find((e) => e.value.trim() === entity)?.sourceType || config.depots[0]?.type || 'bigquery'
+          ),
+        ],
+        secretType: config.depots[0]?.type || 'bigquery',
+        depots: config.depots.map((d) => ({ name: d.name, type: d.type })),
+        scanners: config.scanners.map((s) => ({
+          name: s.name,
+          depot: s.depot,
+          includePattern: s.includePattern,
+        })),
+        clusterName: config.clusterName,
       }));
 
-      // Generate consumer-aligned data product
       const consumerProduct = {
         name: config.projectName,
         entity: config.consumptionLayer,
-        entities: validSemanticEntities,
+        entities: validEntities,
+        semanticEntities: validSemanticEntities,
+        sourceTypes: config.dataProductEntities.map((e) => normalizeSourceType(e.sourceType)),
         type: 'consumer' as const,
-        createdAt: new Date()
+        createdAt: new Date(),
+        secretType: config.depots[0]?.type || 'bigquery',
+        depots: config.depots.map((d) => ({ name: d.name, type: d.type })),
+        scanners: config.scanners.map((s) => ({
+          name: s.name,
+          depot: s.depot,
+          includePattern: s.includePattern,
+        })),
+        clusterName: config.clusterName,
       };
 
-      // Simulate generation process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       setGenerationResult('Project generated successfully!');
       setPreviewData({
         projectName: config.projectName,
         dataProducts: sourceProducts,
-        consumptionLayer: consumerProduct
+        consumptionLayer: consumerProduct,
       });
-
     } catch {
       setGenerationResult('Error generating project');
     } finally {
@@ -156,56 +568,65 @@ export default function Home() {
 
   const handleDownloadZip = async () => {
     if (!previewData) return;
-
     setIsDownloading(true);
-    
     try {
       const zip = new JSZip();
 
-      const validEntities = config.dataProductEntities.filter(e => e.trim() !== '');
-      const validSemanticEntities = config.useCustomSemanticEntities 
-        ? config.semanticEntities.filter(e => e.trim() !== '')
-        : validEntities;
-
-      // Generate source-aligned data products
-      const sourceProducts = validEntities.map(entity => ({
+      const sourceProducts = validEntities.map((entity) => ({
         name: config.projectName,
-        entity: entity,
+        entity,
         type: 'source' as const,
-        createdAt: new Date()
+        createdAt: new Date(),
+        sourceTypes: [
+          normalizeSourceType(
+            config.dataProductEntities.find((e) => e.value.trim() === entity)?.sourceType || config.depots[0]?.type || 'bigquery'
+          ),
+        ],
+        secretType: config.depots[0]?.type || 'bigquery',
+        depots: config.depots.map((d) => ({ name: d.name, type: d.type })),
+        scanners: config.scanners.map((s) => ({
+          name: s.name,
+          depot: s.depot,
+          includePattern: s.includePattern,
+        })),
+        clusterName: config.clusterName,
       }));
 
-      // Generate consumer-aligned data product
       const consumerProduct = {
         name: config.projectName,
         entity: config.consumptionLayer,
-        entities: validSemanticEntities,
+        entities: validEntities,
+        semanticEntities: validSemanticEntities,
+        sourceTypes: config.dataProductEntities.map((e) => normalizeSourceType(e.sourceType)),
         type: 'consumer' as const,
-        createdAt: new Date()
+        createdAt: new Date(),
+        secretType: config.depots[0]?.type || 'bigquery',
+        depots: config.depots.map((d) => ({ name: d.name, type: d.type })),
+        scanners: config.scanners.map((s) => ({
+          name: s.name,
+          depot: s.depot,
+          includePattern: s.includePattern,
+        })),
+        clusterName: config.clusterName,
       };
 
-      // Generate all files
       const allFiles = [
-        ...sourceProducts.flatMap(product => generateYamlFiles(product)),
-        ...generateYamlFiles(consumerProduct)
+        ...sourceProducts.flatMap((product) => generateYamlFiles(product)),
+        ...generateYamlFiles(consumerProduct),
       ];
 
-      // Add all files to zip
-      allFiles.forEach(file => {
-          zip.file(file.path, file.content);
-      });
+      allFiles.forEach((file) => zip.file(file.path, file.content));
 
-      // Generate and download zip
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${config.projectName}-data-product.zip`;
+      a.download = `${config.projectName || 'data-product'}-project.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       setGenerationResult('Project files downloaded successfully!');
     } catch (error) {
       console.error('Error generating ZIP file:', error);
@@ -215,591 +636,353 @@ export default function Home() {
     }
   };
 
-  const isValid = config.projectName.trim() !== '' && 
-                 config.dataProductEntities.some(e => e.trim() !== '') &&
-                 config.consumptionLayer.trim() !== '';
+  const goNext = () => {
+    if (!canContinue) return;
+    setCurrentStep((s) => Math.min(s + 1, steps.length - 1));
+  };
+
+  const goBack = () => setCurrentStep((s) => Math.max(0, s - 1));
+  const goToStep = (step: number) => setCurrentStep(() => Math.min(Math.max(step, 0), steps.length - 1));
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-700">Project name</label>
+            <input
+              type="text"
+              value={config.projectName}
+              onChange={(e) => setConfig((prev) => ({ ...prev, projectName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., customer-platform"
+            />
+            <p className="text-xs text-gray-500">Used as the top-level folder name.</p>
+          </div>
+        );
+      case 1:
+        return (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-gray-500">
+                Secret type will be inferred from your first depot type.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">Depots</label>
+                <button
+                  type="button"
+                  onClick={addDepot}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  + Add depot
+                </button>
+              </div>
+              {config.depots.map((depot, index) => (
+                <div key={depot.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                  <input
+                    type="text"
+                    value={depot.name}
+                    onChange={(e) => updateDepot(index, { name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Depot name (e.g., bigquery)"
+                  />
+                  <select
+                    value={depot.type}
+                    onChange={(e) => updateDepot(index, { type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="bigquery">BigQuery</option>
+                    <option value="snowflake">Snowflake</option>
+                    <option value="postgres">Postgres</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeDepot(index)}
+                    disabled={config.depots.length === 1}
+                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Cluster name</label>
+              <input
+                type="text"
+                value={config.clusterName}
+                onChange={(e) => setConfig((prev) => ({ ...prev, clusterName: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., minervac"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">Scanners</label>
+                <button
+                  type="button"
+                  onClick={addScanner}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  + Add scanner
+                </button>
+              </div>
+              {config.scanners.map((scanner, index) => (
+                <div key={scanner.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
+                  <input
+                    type="text"
+                    value={scanner.name}
+                    onChange={(e) => updateScanner(index, { name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Scanner name"
+                  />
+                  <input
+                    type="text"
+                    value={scanner.depot}
+                    onChange={(e) => updateScanner(index, { depot: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Depot name"
+                  />
+                  <input
+                    type="text"
+                    value={scanner.includePattern}
+                    onChange={(e) => updateScanner(index, { includePattern: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Schema include (optional)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeScanner(index)}
+                    disabled={config.scanners.length === 1}
+                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              These settings feed into instance-secret, depot, cluster, and scanner YAMLs. Scanner depots will be referenced in
+              generated scanner configs.
+            </p>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="space-y-3">
+            <SourcesForm
+              items={config.dataProductEntities}
+              onAdd={addSourceRow}
+              onRemove={removeSourceRow}
+              onChangeName={(index, value) => updateSourceRow(index, { value })}
+              onChangeSourceType={(index, type) => updateSourceRow(index, { sourceType: type })}
+            />
+            {validEntities.length === 0 && (
+              <p className="text-xs text-red-600">Add at least one source-aligned data product to continue.</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={goBack}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canContinue}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Consumer / analytics name</label>
+              <input
+                type="text"
+                value={config.consumptionLayer}
+                onChange={(e) => setConfig((prev) => ({ ...prev, consumptionLayer: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., customer-360"
+              />
+              <p className="text-xs text-gray-500">This becomes the consumer directory (3.1-...).</p>
+            </div>
+            <SemanticForm
+              useCustomSemanticEntities={config.useCustomSemanticEntities}
+              items={config.semanticEntities}
+              onAdd={addSemanticRow}
+              onRemove={removeSemanticRow}
+              onChange={(index, value) => updateSemanticRow(index, value)}
+              onToggleCustom={(checked) => setConfig((prev) => ({ ...prev, useCustomSemanticEntities: checked }))}
+            />
+          </div>
+        );
+      case 4:
+      default:
+        return (
+          <div className="space-y-5">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-gray-900">Review & export</h2>
+              <p className="text-sm text-gray-600">
+                Double-check everything before generating. Preview shows the folder tree; Generate writes the configs in memory, and Download
+                saves a ZIP of all YAMLs.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Edit sources
+                </button>
+                <span className="text-gray-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Edit infra
+                </button>
+                <span className="text-gray-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => goToStep(3)}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Edit consumer
+                </button>
+              </div>
+            </div>
+
+            <ReviewCard
+              projectName={config.projectName}
+              sources={validEntities}
+              semanticEntities={validSemanticEntities}
+              consumptionLayer={config.consumptionLayer}
+              clusterName={config.clusterName}
+              secretType={config.depots[0]?.type || '—'}
+              depots={config.depots}
+              scanners={config.scanners}
+            />
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={generatePreview}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Preview tree
+              </button>
+              <button
+                type="button"
+                onClick={generateProject}
+                disabled={isGenerating}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {isGenerating ? 'Generating...' : 'Generate'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadZip}
+                disabled={!previewData || isDownloading}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+              >
+                {isDownloading ? 'Downloading...' : 'Download ZIP'}
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Need to change something? Use Back to revisit any step, then return here to regenerate.
+            </p>
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1"></div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Data Product Generator
-            </h1>
-            <div className="flex-1 flex justify-end">
-              <a
-                href="/data-product-generator/lens-generator"
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-              >
-                🔍 Lens Generator
-              </a>
-            </div>
+        <header className="mb-8">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-gray-900">Data Product Generator</h1>
+            <a
+              href="/data-product-generator/lens-generator"
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            >
+              🔍 Lens Generator
+            </a>
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-600">Connected</span>
-          </div>
+          <p className="text-sm text-gray-600 mt-1">
+            Build your data product in 4 simple steps.
+          </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Panel - Project Configuration */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Project Configuration</h2>
-            
-            {/* Project Name */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Name
-              </label>
-              <input
-                type="text"
-                value={config.projectName}
-                onChange={(e) => setConfig(prev => ({ ...prev, projectName: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter project name"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter a unique name for your data product project. Use only letters, numbers, hyphens, and underscores (no spaces or special characters).
-              </p>
-            </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <StepHeader currentStep={currentStep} />
 
-            {/* Data Product Entities */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Product Entities
-              </label>
-              {config.dataProductEntities.map((entity, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={entity}
-                    onChange={(e) => updateDataProductEntity(index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter entity name"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">{renderStep()}</div>
+
+            <aside className="bg-gray-50 rounded-lg p-4 space-y-4">
+              <div className="text-sm font-semibold text-gray-900">Progress</div>
+              <div className="text-sm text-gray-700">
+                Step {currentStep + 1} of {steps.length}: {steps[currentStep].title}
+              </div>
+              <div className="space-x-2">
+                {currentStep > 0 && (
                   <button
-                    onClick={() => removeDataProductEntity(index)}
-                    className="px-2 py-2 text-red-600 hover:text-red-800"
+                    type="button"
+                    onClick={goBack}
+                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                   >
-                    ✕
+                    Back
                   </button>
-                </div>
-              ))}
-              <button
-                onClick={addDataProductEntity}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                + Add Entity
-              </button>
-              <p className="text-xs text-gray-500 mt-1">
-                Entities that will have full build/deploy configurations. Use only letters, numbers, hyphens, and underscores (no spaces or special characters).
-              </p>
+                )}
+                {currentStep < steps.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!canContinue}
+                    className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                )}
               </div>
 
-            {/* Consumption Layer */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Consumption Layer
-              </label>
-              <input
-                type="text"
-                value={config.consumptionLayer}
-                onChange={(e) => setConfig(prev => ({ ...prev, consumptionLayer: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., customer-360"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Single name only - This is the directory name for your analytics/consumption layer (e.g., &apos;analytics&apos;, &apos;data-warehouse&apos;, &apos;consumption&apos;). Do not enter multiple entities here - use only letters, numbers, hyphens, and underscores. Avoid using the same name as your project.
-              </p>
-            </div>
-
-            {/* Semantic Entities */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="checkbox"
-                  checked={config.useCustomSemanticEntities}
-                  onChange={(e) => setConfig(prev => ({ ...prev, useCustomSemanticEntities: e.target.checked }))}
-                  className="rounded"
-                />
-                <label className="text-sm font-medium text-gray-700">
-                  Use custom semantic entities (optional)
-                </label>
-              </div>
-              {config.useCustomSemanticEntities && (
-                <div>
-                  {config.semanticEntities.map((entity, index) => (
-                    <div key={index} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={entity}
-                        onChange={(e) => updateSemanticEntity(index, e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter semantic entity name"
-                      />
-                      <button
-                        onClick={() => removeSemanticEntity(index)}
-                        className="px-2 py-2 text-red-600 hover:text-red-800"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addSemanticEntity}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    + Add Semantic Entity
-                  </button>
+              {previewData && (
+                <div className="text-sm text-gray-700">
+                  <div className="font-semibold mb-1">Preview ready</div>
+                  <div>{previewData.projectName}</div>
+                  <div>{previewData.dataProducts.length} source(s)</div>
+                  <div>Consumer: {previewData.consumptionLayer.name}</div>
                 </div>
               )}
-              <p className="text-xs text-gray-500 mt-1">
-                Additional entities for semantic modeling (defaults to data product entities). Use only letters, numbers, hyphens, and underscores (no spaces or special characters).
-              </p>
-          </div>
-          
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-              <button
-                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md cursor-not-allowed"
-                disabled
-              >
-                ✓ Validate
-              </button>
-              <button
-                onClick={generatePreview}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Preview
-              </button>
-              <button
-                onClick={generateProject}
-                disabled={!isValid || isGenerating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isGenerating ? 'Generating...' : '✔ Generate Project'}
-              </button>
-                    <button
-                onClick={handleDownloadZip}
-                disabled={!previewData || isDownloading}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isDownloading ? (
-                        <>
-                    <svg className="animate-spin h-4 w-4 inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                    <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                    Download ZIP
-                        </>
-                      )}
-                    </button>
-            </div>
-          </div>
-          
-          {/* Right Panel - Project Preview & Generation Results */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Project Preview & Generation Results</h2>
-            
-            {previewData && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Project Preview</h3>
-                    <button
-                    onClick={() => setShowDetails(!showDetails)}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                    {showDetails ? 'Hide Details' : 'Show Details'}
-                    </button>
-                </div>
-                <div className="bg-gray-50 rounded-md p-4 font-mono text-sm">
-                  <div className="text-blue-600">{previewData.projectName}/</div>
-                  
-                  {/* Data Products */}
-                  <div className="ml-4 mt-2">
-                    <div className="text-green-600">Data Products:</div>
-                    {previewData.dataProducts.map((product, index: number) => (
-                      <div key={index} className="ml-4 mt-1">
-                        <div className="text-blue-600">{product.entity}/</div>
-                        <div className="ml-4">
-                          <div className="text-blue-600">build/</div>
-                          <div className="ml-4">
-                            <div>data-processing/config-{product.entity}-flare.yaml</div>
-                            <div>quality/config-{product.entity}-quality.yaml</div>
-                        </div>
-                          <div className="text-blue-600">deploy/</div>
-                          <div className="ml-4">
-                            <div>config-{product.entity}-scanner.yaml</div>
-                            <div>config-{product.entity}-bundle.yaml</div>
-                            <div>config-{product.entity}-dp.yaml</div>
-                            <div>pipeline.yaml</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
 
-                  {/* Consumption Layer */}
-                  <div className="ml-4 mt-4">
-                    <div className="text-green-600">Consumption Layer: {previewData.consumptionLayer.name}/</div>
-                    <div className="ml-4 mt-1">
-                      <div className="text-blue-600">activation/</div>
-                      <div className="ml-4">
-                        <div className="text-purple-600">custom-application/</div>
-                        <div className="text-purple-600">data-apis/</div>
-                        <div className="text-purple-600">notebook/</div>
-                      </div>
-                      <div className="text-blue-600">build/</div>
-                                              <div className="ml-4">
-                          <div className="text-purple-600">access-control/</div>
-                          <div className="ml-4">
-                            <div className="text-purple-600">{previewData.consumptionLayer.name}-access-control.yaml</div>
-                            {showDetails && (
-                              <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1 mb-2">
-                                <pre className="whitespace-pre-wrap">{`version: v1
-name: masking-policy
-type: policy
-layer: user
-description: "Data policy to apply hashing for personally identifiable information (PII) columns based on column names"
-owner:
-policy:
-  data:
-    type: mask
-    priority: 70
-    selector:
-      user:
-        match: any
-        tags:
-          - "roles:id:user-masking-access"
-      column:
-        tags:
-          - "PII.Masking"
-    mask:
-      operator: hash
-      hash:
-        algo: sha256
----
-version: v1
-name: piireader
-type: policy
-layer: user
-description: "Data policy enabling controlled read access to PII columns"
-owner:
-policy:
-  data:
-    type: mask
-    priority: 65
-    selector:
-      user:
-        match: any
-        tags:
-          - roles:id:pii-reader
-      column:
-        tags:
-          - "PII.Masking"
-    mask:
-      operator: pass_through`}</pre>
-                              </div>
-                            )}
-                          </div>
-                        <div>semantic-model/{previewData.consumptionLayer.name}/model/</div>
-                        <div className="ml-4">
-                          <div className="text-blue-600">sqls/ {!showDetails && `(${previewData.consumptionLayer.entities.length} files)`}</div>
-                          {showDetails && (
-                            <div className="ml-4">
-                              {previewData.consumptionLayer.entities.map((entity: string, index: number) => (
-                                <div key={index} className="mb-2">
-                                  <div className="text-purple-600">{entity}.sql</div>
-                                  <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1">
-                                    <pre className="whitespace-pre-wrap">{`SELECT
-  *
-FROM
-  lakehouse.sandbox.${entity}`}</pre>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="text-blue-600">tables/ {!showDetails && `(${previewData.consumptionLayer.entities.length} files)`}</div>
-                          {showDetails && (
-                            <div className="ml-4">
-                              {previewData.consumptionLayer.entities.map((entity: string, index: number) => (
-                                <div key={index} className="mb-2">
-                                  <div className="text-purple-600">{entity}.yaml</div>
-                                  <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1">
-                                    <pre className="whitespace-pre-wrap">{`tables:
-  - name: ${entity}
-    sql: {{ load_sql('${entity}') }}
-    description: Comprehensive ${entity} data for business analytics, reporting, and operational insights
-    data_source: icebase
-    public: true
-    joins:
-      - name: ${entity}
-        relationship: one_to_many
-        sql: "{{TABLE.${entity}_id}}= {${entity}.${entity}_id}"
-    dimensions:
-      - name: ${entity}_id
-        description: "Primary business identifier for ${entity} used in data relationships and analytics"
-        type: string
-        sql: ${entity}_id
-        primary_key: true
-      - name: ${entity}_name
-        description: "Name of the ${entity}"
-        type: string
-        sql: ${entity}_name
-      - name: ${entity}_created_at
-        description: "Creation timestamp for ${entity}"
-        type: timestamp
-        sql: ${entity}_created_at
-      - name: ${entity}_updated_at
-        description: "Last update timestamp for ${entity}"
-        type: timestamp
-        sql: ${entity}_updated_at
-    measures:
-      - name: total_${entity}
-        sql: ${entity}_id
-        type: count
-        description: "Total count of ${entity} records for business metrics and KPI calculations"`}</pre>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div>views/</div>
-                          <div className="text-purple-600">user_groups.yml</div>
-                          {showDetails && (
-                            <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1 mb-2">
-                              <pre className="whitespace-pre-wrap">{`user_groups:
-  - name: compliance_category
-    api_scopes:
-      - meta
-      - data
-      - graphql
-      - jobs
-      - source
-    includes:
-      - users:id:shubhanshujain
-      - users:id:dinkercharak
-      - users:id:kishanmahajan
-  - name: reader
-    api_scopes:
-      - meta
-      - data
-      - graphql
-      - jobs
-      - source
-    includes:
-      - users:id:yogeshkhangode
-    excludes:
-      - users:id:kishanmahajan
-  - name: default
-    api_scopes:
-      - meta
-      - data
-      - graphql
-      - jobs
-      - source
-    includes: "*"`}</pre>
-                            </div>
-                          )}
-                          <div className="text-purple-600">deployment.yaml</div>
-                          {showDetails && (
-                            <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1 mb-2">
-                              <pre className="whitespace-pre-wrap">{`version: v1alpha
-name: "${previewData.consumptionLayer.name}"
-layer: user
-type: lens
-tags:
-  - Tier.Gold
-description: Deployment of ${previewData.consumptionLayer.name} Lens2 for advanced monitoring and optimized management capabilities.
-lens:
-  compute: runnable-default
-  secrets:
-    - name: gitsecret
-      allKeys: true
-  source:
-    type: minerva
-    name: minervac
-    catalog: icebase
-  repo:
-    url: https://bitbucket.org/rubik_/solutions
-    lensBaseDir: solutions/
-  syncFlags:
-    - --ref=canned-demo
-  api:
-    replicas: 1
-    logLevel: info
-    envs:
-      LENS2_SCHEDULED_REFRESH_TIMEZONES: "UTC,America/Vancouver,America/Toronto"
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 2000m
-        memory: 2048Mi
-  worker:
-    replicas: 1
-    logLevel: info
-    envs:
-      LENS2_SCHEDULED_REFRESH_TIMEZONES: "UTC,America/Vancouver,America/Toronto"
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 1000m
-        memory: 1048Mi
-  router:
-    logLevel: info
-    envs:
-      LENS2_SCHEDULED_REFRESH_TIMEZONES: "UTC,America/Vancouver,America/Toronto"
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 1000m
-        memory: 1048Mi
-  metric:
-    logLevel: info`}</pre>
-                            </div>
-                          )}
-                          <div className="text-purple-600">config.yaml</div>
-                          {showDetails && (
-                            <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1 mb-2">
-                            <pre className="whitespace-pre-wrap">{`logical_model: analytics
-source: icebase
-schema: retail
-
-# Entity definitions with columns and types
-entities:
-${previewData.consumptionLayer.entities.map((entity: string) => `  ${entity}:
-    dimensions:
-      - name: ${entity}_id
-        type: number
-        primary_key: true
-      - name: ${entity}_name
-        type: string
-      - name: ${entity}_created_at
-        type: timestamp
-      - name: ${entity}_updated_at
-        type: timestamp`).join('\n\n')}
-
-  transaction:
-    dimensions:
-      - name: transaction_id
-        type: number
-        primary_key: true
-      - name: transaction_amount
-        type: number
-      - name: transaction_date
-        type: timestamp
-${previewData.consumptionLayer.entities.map((entity: string) => `      - name: ${entity}_id
-        type: number`).join('\n')}
-
-    joins:
-${previewData.consumptionLayer.entities.map((entity: string) => `      - name: ${entity}
-        relationship: many_to_one
-        sql: "{{TABLE.${entity}_id}} = {${entity}.${entity}_id}"`).join('\n')}`}</pre>
-                            </div>
-                          )}
-                          <div className="text-purple-600">docker-compose.yml</div>
-                          {showDetails && (
-                            <div className="ml-4 text-xs text-gray-600 bg-gray-100 p-2 rounded mt-1 mb-2">
-                              <pre className="whitespace-pre-wrap">{`version: "2.2"
-x-lens2-environment: &lens2-environment
-  # DataOS
-  DATAOS_FQDN: known-racer.dataos.app
-  # Overview
-  LENS2_NAME: device360
-  LENS2_DESCRIPTION: "Ecommerce use case on Adventureworks sales data"
-  LENS2_TAGS: "lens2, ecom, sales and customer insights"
-  LENS2_AUTHORS: "user1, user2"
-  LENS2_SCHEDULED_REFRESH_TIMEZONES: "UTC,America/Vancouver,America/Toronto"
-  # Data Source
-  LENS2_SOURCE_TYPE: minerva
-  LENS2_SOURCE_NAME: system
-  LENS2_SOURCE_CATALOG_NAME: icebase
-  DATAOS_RUN_AS_APIKEY: TGVucy45YTE5M2FmZC03MjBkLTQ4ZWMtOWNkOC04M2ZjMDQ0OTllZDc=
-  MINERVA_TCP_HOST: tcp.known-racer.dataos.app
-  # Log
-  LENS2_LOG_LEVEL: error
-  CACHE_LOG_LEVEL: "trace"
-  # Operation
-  LENS2_DEV_MODE: true
-  LENS2_DEV_MODE_PLAYGROUND: false
-  LENS2_REFRESH_WORKER: true
-  LENS2_SCHEMA_PATH: model
-  LENS2_PG_SQL_PORT: 5432
-  CACHE_DATA_DIR: "/var/work/.store"
-  NODE_ENV: production
-
-services:
-  api:
-    restart: always
-    image: rubiklabs/lens2:0.35.18-61-dev
-    ports:
-      - 4000:4000
-      - 25432:5432
-      - 13306:13306
-    environment:
-      <<: *lens2-environment
-    volumes:
-      - ./model:/etc/dataos/work/model`}</pre>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-blue-600">deploy/</div>
-                      <div className="ml-4">
-                        <div className="text-purple-600">config-data-product-scanner.yaml</div>
-                        <div className="text-purple-600">config-{previewData.consumptionLayer.name}-bundle.yaml</div>
-                        <div className="text-purple-600">config-{previewData.consumptionLayer.name}-dp.yaml</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Semantic Entities */}
-                  <div className="ml-4 mt-4 text-sm text-gray-600">
-                    Semantic Entities: {previewData.consumptionLayer.entities.join(', ')}
-                  </div>
-                </div>
-              </div>
-            )}
-
-                        {/* Generation Results */}
-            {generationResult && (
-              <div className="mt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Generation Results</h3>
-                <div className={`p-4 rounded-md ${
-                  generationResult.includes('successfully') 
-                    ? 'bg-green-50 text-green-800 border border-green-200' 
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
+              {generationResult && (
+                <div
+                  className={`p-3 rounded-md text-sm ${
+                    generationResult.includes('successfully')
+                      ? 'bg-green-50 text-green-800'
+                      : 'bg-red-50 text-red-800'
+                  }`}
+                >
                   {generationResult}
                 </div>
-                {generationResult.includes('Project generated successfully') && (
-                  <div className="mt-4 p-3 bg-blue-50 text-blue-800 border border-blue-200 rounded-md">
-                    <p className="text-sm">
-                      💡 <strong>Tip:</strong> Use the &quot;Download ZIP&quot; button to download all generated YAML files as a ZIP archive.
-                    </p>
-                  </div>
-                )}
-            </div>
-            )}
+              )}
+            </aside>
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

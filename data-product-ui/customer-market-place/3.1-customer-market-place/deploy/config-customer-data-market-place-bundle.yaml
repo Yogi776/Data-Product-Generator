@@ -1,0 +1,12 @@
+name: npa-early-warning-bundle
+version: v1beta
+type: bundle
+tags:
+  - Tier.Gold
+description: The purpose of the bundle is to deploy the consumer-aligned resources of the npa-early-warning Data Product, making it available for business consumption and analytics.
+layer: "user"
+bundle:
+  resources:
+    - id: npa-early-warning-pipeline
+      file: npa-early-warning/npa-early-warning/build/semantic-model/npa-early-warning/model/deployment.yaml
+      workspace: public

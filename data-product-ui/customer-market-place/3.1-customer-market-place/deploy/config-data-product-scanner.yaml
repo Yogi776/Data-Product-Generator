@@ -1,0 +1,24 @@
+name: wf-npa-early-warning-data-product-scanner
+version: v1
+type: workflow
+description: |
+  Scans and registers npa-early-warning consumer-aligned data products and semantic models into the data catalog.
+workflow:
+  dag:
+    - name: npa-early-warning-data-product-scanner
+      description: |
+        Scans the semantic model for npa-early-warning and registers it into the data catalog.
+      title: npa-early-warning Data Product Scanner
+      spec:
+        stack: scanner:2.0
+        compute: runnable-default
+        runAsUser: metis
+        stackSpec:
+          type: semantic-model
+          sourceConfig:
+            config:
+              type: SemanticModel
+              markDeletedDataProducts: true
+              dataProductFilterPattern:
+                includes:
+                  - npa-early-warning

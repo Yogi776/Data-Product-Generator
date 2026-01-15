@@ -1,0 +1,6 @@
+urlPath: /customer-360_sample_api
+description: Sample API for customer-360
+response : 
+    - name: sample_field
+      description: Example response field
+source: customer-360

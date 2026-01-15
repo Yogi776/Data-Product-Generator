@@ -1,0 +1,25 @@
+---
+version: v1alpha
+name: "customer-360"
+layer: user
+type: lens
+tags:
+  - Tier.Gold
+description: Deployment of customer-360 Lens for analytics.
+lens:
+  compute: runnable-default
+  source:
+    type: minerva
+    name: minervac
+    catalog: icebase
+  repo:
+    url: https://example.com/customer-360.git
+    lensBaseDir: customer-360/3.1-customer-360/customer-360/semantic-model
+    syncFlags:
+      - --ref=main
+  api:
+    replicas: 1
+    logLevel: info
+  worker:
+    replicas: 1
+    logLevel: info

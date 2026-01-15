@@ -1,0 +1,38 @@
+name: customer-360-talos-api
+version: v1
+type: service
+tags:
+  - dataos:talos-service
+  - Domain.customer-360
+description: Talos service for customer-360 data.
+workspace: public
+service:
+  servicePort: 3000
+  ingress:
+    enabled: true
+    stripPath: true
+    path: /talos/public:customer-360-talos-api
+    noAuthentication: false
+  replicas: 1
+  logLevel: DEBUG
+  compute: runnable-default
+  envs:    
+    TALOS_SCHEMA_PATH: customer-360/3.1-customer-360/activation/data-apis/lens-talos
+    TALOS_BASE_PATH: /talos/public:customer-360-talos-api
+  resources: 
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  stack: talos:2.0
+  dataosSecrets:
+    - name: customer-360-secret
+      allKeys: true
+  stackSpec:
+    repo:
+      url: https://example.com/customer-360.git
+      projectDirectory: customer-360/3.1-customer-360/activation/data-apis/lens-talos
+      syncFlags:   
+        - --ref=main

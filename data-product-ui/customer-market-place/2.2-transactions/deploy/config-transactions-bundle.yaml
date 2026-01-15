@@ -1,0 +1,12 @@
+name: transactions-bundle
+version: v1beta
+type: bundle
+tags:
+  - Tier.Gold
+description: The purpose of the bundle is to deploy the resources of the transactions Data Product, making it available for consumption in transactions.
+layer: "user"
+bundle:
+  resources:
+    - id: transactions-pipeline
+      file: transactions/transactions/deploy/pipeline.yaml
+      workspace: public

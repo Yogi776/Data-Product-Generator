@@ -1,0 +1,15 @@
+name: postgres
+version: v1
+type: depot
+tags:
+  - Tier.Gold
+layer: user
+depot:
+  name: postgres
+  type: postgres
+  description: Depot configuration for postgres.
+  external: true
+  connectionSecret:
+    - name: postgres-secret
+      allKeys: true
+  source: postgres

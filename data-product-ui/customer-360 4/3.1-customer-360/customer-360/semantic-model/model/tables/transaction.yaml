@@ -1,0 +1,19 @@
+tables:
+  - name: transaction
+    sql: {{ load_sql('transaction') }}
+    description: Comprehensive transaction data for analytics and reporting
+    data_source: icebase
+    public: true
+
+    dimensions:
+      - name: transaction_id
+        description: "Primary business identifier for transaction"
+        type: string
+        sql: transaction_id
+        primary_key: true
+
+    measures:
+      - name: total_transaction
+        sql: transaction_id
+        type: count
+        description: "Total count of transaction records"

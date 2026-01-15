@@ -1,0 +1,42 @@
+name: customer-360-dp
+version: v1beta
+type: data
+description: |
+  customer-360 consumer-aligned data product delivers business-ready analytics and insights, enabling data-driven decision making and operational excellence.
+tags:
+  - DPUsecase.customer_360
+  - DPTier.Consumer Aligned
+  - DPDomain.customer_360
+purpose: |
+  Enables business users to make informed decisions by providing clean, aggregated, and business-ready data for reporting, analytics, and operational dashboards.
+v1beta:
+  data:
+    meta:
+      title: customer-360
+      sourceCodeUrl: https://example.com/customer-360
+    collaborators:
+      - name: owner
+        description: owner
+      - name: developer
+        description: developer
+    resource:
+      refType: dataos
+      ref: bundle:v1beta:customer-360-bundle
+    inputs:
+      - refType: dataos
+        ref: dataset:icebase:customer_360:customer
+      - refType: dataos
+        ref: dataset:icebase:customer_360:transaction
+    ports:
+      rest:
+        - url: https://example.com/api/v2/rest
+          meta:
+            description: REST API access for customer-360 data operations
+
+      lens:
+        ref: lens:v1alpha:customer-360:public  
+        refType: dataos
+
+      talos:
+        ref: service:v1:customer-360-talos-api:public
+        refType: dataos

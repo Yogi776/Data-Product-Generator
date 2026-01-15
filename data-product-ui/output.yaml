@@ -1,0 +1,49 @@
+outputs:
+  icebase:
+    - name: employee_target
+      dataset: dataos://{icebase}:{schema}/{table_name}?acl=rw
+      format: Iceberg
+      description: The employee_target table is a structured dataset that contains comprehensive information about various employee target within the organization. It serves as a central repository for employee target data, facilitating efficient management, analysis, and decision-making processes related to employee target operations, logistics, and business engagement.
+      tags:
+      - Tier.Gold
+      options:
+        saveMode: overwrite
+        iceberg:
+          properties:
+            write.format.default: parquet
+            write.metadata.compression-codec: gzip
+      title: Employee Details Dataset
+
+  oracle:
+    - name: employee_target
+      dataset: dataos://{oracle}:{schema}/{table_name}?acl=rw
+      driver: oracle.jdbc.driver.OracleDriver
+      format: jDBC
+      description: The employee_target table is a structured dataset that contains comprehensive information about various employee target within the organization. It serves as a central repository for employee target data, facilitating efficient management, analysis, and decision-making processes related to employee target operations, logistics, and business engagement.
+      tags:
+      - Tier.Gold
+      options:
+        saveMode: overwrite
+
+  postgres:
+    - name: employee_target
+      dataset: dataos://postgres:{schema}/{table_name}?acl=rw
+      driver: org.postgresql.Driver
+      format: jDBC
+      description: The employee_target table is a structured dataset that contains comprehensive information about various employee target within the organization. It serves as a central repository for employee target data, facilitating efficient management, analysis, and decision-making processes related to employee target operations, logistics, and business engagement.
+      tags:
+      - Tier.Gold
+      options:
+        saveMode: overwrite
+
+  snowflake:
+    - name: employee_target
+      dataset: dataos://snowflake:{schema}/{table_name}?acl=rw
+      format: Snowflake
+      description: The employee_target table is a structured dataset that contains comprehensive information about various employee target within the organization. It serves as a central repository for employee target data, facilitating efficient management, analysis, and decision-making processes related to employee target operations, logistics, and business engagement.
+      tags:
+      - Tier.Gold
+      options:
+        extraOptions:
+          sfWarehouse: COMPUTE_WH
+        saveMode: overwrite
